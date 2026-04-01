@@ -35,3 +35,12 @@ out/
 
 ### VS Code ###
 .vscode/
+
+
+### 프로젝트용 ###
+관련 자료
+docs
+
+### 민감한 데이터 ###
+application.properties
+application.yml

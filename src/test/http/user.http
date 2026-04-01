@@ -1,0 +1,59 @@
+### 기본 URL
+@baseUrl = http://localhost:8080
+@accessToken = 여기에_토큰_붙여넣기
+
+###
+# 회원가입
+POST {{baseUrl}}/user/signup
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "password": "Test1234!",
+  "nickname": "테스터",
+  "height": 170,
+  "weight": 70,
+  "gender": "MALE",
+  "activityLevel": "MEDIUM"
+}
+
+###
+# 회원가입 - 이메일 중복 테스트
+POST {{baseUrl}}/user/signup
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "password": "Test1234!",
+  "nickname": "테스터2",
+  "height": 170,
+  "weight": 70,
+  "gender": "MALE",
+  "activityLevel": "MEDIUM"
+}
+
+###
+# 회원가입 - 유효성 검사 실패 테스트 (비밀번호 짧음)
+POST {{baseUrl}}/user/signup
+Content-Type: application/json
+
+{
+  "email": "test2@test.com",
+  "password": "123",
+  "nickname": "테스터3",
+  "height": 170,
+  "weight": 70,
+  "gender": "FEMALE",
+  "activityLevel": "HIGH"
+}
+
+###
+# 인증 필요한 API 테스트 (토큰 없이 → 401 예상)
+GET {{baseUrl}}/user/test
+Content-Type: application/json
+
+###
+# 인증 필요한 API 테스트 (토큰 포함 → 통과 예상)
+GET {{baseUrl}}/user/test
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}

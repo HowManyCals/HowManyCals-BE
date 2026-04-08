@@ -16,7 +16,11 @@ public enum ResponseCode {
     SUCCESS_SIGNUP(1000, true, "회원가입에 성공했어요."),
     DUPLICATED_USER_EMAIL(1001, false, "이미 사용 중인 이메일이에요."),
     NOT_FOUND_AUTHORIZATION(1002, false, "인증 헤더가 존재하지 않아요."),
-    INVALID_AUTHORIZATION(1003,false,"인증 헤더가 Bearer 방식이 아니에요");
+    INVALID_AUTHORIZATION(1003, false, "인증 헤더가 Bearer 방식이 아니에요."),
+    INVALID_TOKEN(1004, false, "유효하지 않은 토큰이에요."),
+    EXPIRED_TOKEN(1005, false, "만료된 토큰이에요."),
+    INVALID_USER_EMAIL(1006, false, "올바르지 않은 이메일이에요."),
+    INVALID_PASSWORD(1007, false, "올바르지 않은 패스워드예요.");
     //endregion
     private final Integer code;
     private final Boolean success;

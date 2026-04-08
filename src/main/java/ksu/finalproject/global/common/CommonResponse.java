@@ -1,11 +1,13 @@
 package ksu.finalproject.global.common;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
 @Data // Getter, Setter Auto 생성
 @AllArgsConstructor
+@JsonPropertyOrder({"code", "success", "message", "data"})
 public class CommonResponse<T> {
     // CommonResponse의 구조 정의
     private Integer code;

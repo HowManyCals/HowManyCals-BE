@@ -1,5 +1,6 @@
 package ksu.finalproject.global.config;
 
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,9 +20,9 @@ public class SecurityConfig {
             // JWT Token 사용하니 disable
             .csrf(csrf -> csrf.disable())
             .headers(headers -> headers.frameOptions(frame -> frame.disable())) // H2 콘솔 iframe 허용
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/user/signup", "/h2-console/**").permitAll()
+                    .requestMatchers("/user/signup", "/user/signin", "/status", "/h2-console/**").permitAll()
                     .anyRequest().authenticated() // 그 외는 로그인 필요
             );
         return http.build();
@@ -31,5 +32,10 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         // Bean 객체로 등록하여 DIP 지키기
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }

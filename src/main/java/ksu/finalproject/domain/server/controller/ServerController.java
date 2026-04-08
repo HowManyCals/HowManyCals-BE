@@ -10,7 +10,7 @@ import java.util.Map;
 
 
 @RestController
-@RequestMapping("/api/")
+@RequestMapping("/status")
 public class ServerController {
     @GetMapping
     public ResponseEntity<?> getStatus(){

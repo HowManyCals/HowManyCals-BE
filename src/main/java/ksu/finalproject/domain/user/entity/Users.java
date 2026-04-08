@@ -57,6 +57,7 @@ public class Users {
     {
         this.refreshToken = token;
     }
+
     @CreatedDate // 자동으로 기재
     @Column(name = "created_at")
     private LocalDateTime createdAt;

@@ -58,6 +58,14 @@ public class Users {
         this.refreshToken = token;
     }
 
+    public void updateProfile(String nickName, Gender gender, Integer height, Integer weight, ActivityLevel activityLevel) {
+        this.nickName = nickName;
+        this.gender = gender;
+        this.height = height;
+        this.weight = weight;
+        this.activityLevel = activityLevel;
+    }
+
     @CreatedDate // 자동으로 기재
     @Column(name = "created_at")
     private LocalDateTime createdAt;

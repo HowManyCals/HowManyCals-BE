@@ -60,4 +60,16 @@ public class JwtProvider {
             return false;
         }
     }
+
+    // 토큰에서 userId 추출
+    public Long getUserId(String token) {
+        return Long.parseLong(
+                Jwts.parserBuilder()
+                        .setSigningKey(this.key)
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody()
+                        .getSubject()
+        );
+    }
 }

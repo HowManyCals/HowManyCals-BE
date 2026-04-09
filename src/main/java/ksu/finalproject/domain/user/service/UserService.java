@@ -4,6 +4,7 @@ import ksu.finalproject.domain.user.dto.SignInRequestDto;
 import ksu.finalproject.domain.user.dto.SignInResponseDto;
 import ksu.finalproject.domain.user.dto.SignUpRequestDto;
 import ksu.finalproject.domain.user.dto.SignUpResponseDto;
+import ksu.finalproject.domain.user.dto.UpdateProfileRequestDto;
 import ksu.finalproject.domain.user.entity.Users;
 import ksu.finalproject.domain.user.entity.enums.AuthProvider;
 import ksu.finalproject.domain.user.repository.UserRepository;
@@ -36,12 +37,7 @@ public class UserService {
         Users user = Users.builder()
                         .email(request.getEmail())
                         .password(encodedPW)
-                        .nickName(request.getNickname())
-                        .height(request.getHeight())
-                        .weight(request.getWeight())
-                        .gender(request.getGender())
-                        .activityLevel(request.getActivityLevel())
-                        .provider(AuthProvider.LOCAL) // 일반 가입
+                        .provider(AuthProvider.LOCAL)
                         .build();
         Users savedUser = userRepository.save(user);
 
@@ -53,13 +49,14 @@ public class UserService {
 
         return new AuthTokens<>(new SignUpResponseDto(accessToken), refreshToken);
     }
+
     public AuthTokens<SignInResponseDto> signIn(SignInRequestDto request) throws CustomException{
         String email = request.getEmail();
         String password = request.getPassword();
 
         // 유효 이메일 확인
         Optional<Users> users = userRepository.findByEmail(email);
-        if(!users.isPresent()) throw new CustomException(ResponseCode.INVALID_USER_EMAIL);
+        if(users.isEmpty()) throw new CustomException(ResponseCode.INVALID_USER_EMAIL);
 
         // 유효 패스워드 확인
         if (!passwordEncoder.matches(password, users.get().getPassword())) {
@@ -73,4 +70,23 @@ public class UserService {
 
         return new AuthTokens<>(new SignInResponseDto(accessToken), refreshToken);
     }
+
+    /**
+     * 회원가입 이후 추가 정보를 저장합니다.
+     * JWT에서 추출한 userId로 유저를 조회하고, 닉네임 / 성별 / 키 / 체중 / 활동 수준을 업데이트합니다.
+     */
+    public void updateProfile(Long userId, UpdateProfileRequestDto request) throws CustomException {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ResponseCode.NOT_FOUND_USER));
+
+        user.updateProfile(
+                request.getNickname(),
+                request.getGender(),
+                request.getHeight(),
+                request.getWeight(),
+                request.getActivityLevel()
+        );
+        userRepository.save(user);
+    }
 }
+

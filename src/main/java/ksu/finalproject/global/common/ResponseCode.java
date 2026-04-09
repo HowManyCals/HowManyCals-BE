@@ -23,12 +23,14 @@ public enum ResponseCode {
     INVALID_PASSWORD(1007, false, "올바르지 않은 패스워드예요."),
     NOT_FOUND_USER(1008, false, "존재하지 않는 사용자예요."),
     SUCCESS_UPDATE_PROFILE(1009, true, "추가 정보 입력에 성공했어요."),
+    SUCCESS_SIGNIN(1010, true, "로그인에 성공했어요."),
+    SUCCESS_REFRESH(1011, true, "토큰이 갱신되었어요."),
     //endregion
     //region    [   2000번대: OAuth 관련  ]
     UNSUPPORTED_OAUTH_PROVIDER(2000, false, "지원하지 않는 소셜 로그인 방식이에요."),
     OAUTH_TOKEN_EXCHANGE_FAILED(2001, false, "소셜 로그인 토큰 교환에 실패했어요."),
     OAUTH_USER_INFO_FAILED(2002, false, "소셜 로그인 사용자 정보 조회에 실패했어요."),
-    LOCAL_PROVIDER_NOT_OAUTH(2003, false, "일반 회원가입은 회원가입 엔드포인트를 이용해 주세요.");
+    SUCCESS_OAUTH_LOGIN(2003, true, "소셜 로그인에 성공했어요.");
     //endregion
     private final Integer code;
     private final Boolean success;

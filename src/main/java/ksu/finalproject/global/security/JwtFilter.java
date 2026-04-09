@@ -25,6 +25,7 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final List<String> WHITELIST = List.of(
             "/user/signup",
             "/user/signin",
+            "/auth/refresh",
             "/status",
             "/h2-console/**"
     );
@@ -70,6 +71,8 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             String accessToken = getToken(request);
 
+            if (jwtProvider.isExpiredToken(accessToken))
+                throw new CustomException(ResponseCode.EXPIRED_TOKEN);
             if (!jwtProvider.isValidToken(accessToken))
                 throw new CustomException(ResponseCode.INVALID_TOKEN);
 

@@ -88,5 +88,24 @@ public class UserService {
         );
         userRepository.save(user);
     }
+
+    /**
+     * refreshToken을 검증하고 새로운 accessToken을 발급합니다.
+     *
+     * @param refreshToken HttpOnly 쿠키에서 추출한 refreshToken 문자열
+     * @return 새로 발급된 accessToken을 담은 SignInResponseDto
+     */
+    public SignInResponseDto refreshAccessToken(String refreshToken) throws CustomException {
+        // DB에 저장된 refreshToken과 일치하는 유저 조회
+        Users user = userRepository.findByRefreshToken(refreshToken)
+                .orElseThrow(() -> new CustomException(ResponseCode.INVALID_TOKEN));
+
+        if (jwtProvider.isExpiredToken(refreshToken))
+            throw new CustomException(ResponseCode.EXPIRED_TOKEN);
+        if (!jwtProvider.isValidToken(refreshToken))
+            throw new CustomException(ResponseCode.INVALID_TOKEN);
+
+        return new SignInResponseDto(jwtProvider.createAccessToken(user.getId()));
+    }
 }
 

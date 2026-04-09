@@ -53,7 +53,7 @@ public class UserController {
         refreshCookie.setMaxAge((int) (jwtProperties.getRefreshTokenExpiration() / 1000));
         response.addCookie(refreshCookie);
 
-        return new CommonResponse<>(ResponseCode.SUCCESS, tokens.response());
+        return new CommonResponse<>(ResponseCode.SUCCESS_SIGNIN, tokens.response());
     }
 
     // [PATCH - 추가 정보 입력]

@@ -25,6 +25,8 @@ public enum ResponseCode {
     SUCCESS_UPDATE_PROFILE(1009, true, "추가 정보 입력에 성공했어요."),
     SUCCESS_SIGNIN(1010, true, "로그인에 성공했어요."),
     SUCCESS_REFRESH(1011, true, "토큰이 갱신되었어요."),
+    SUCCESS_GET_PROFILE(1012, true, "프로필 조회에 성공했어요."),
+    DUPLICATED_NICKNAME(1013, false, "이미 사용 중인 닉네임이에요."),
     //endregion
     //region    [   2000번대: OAuth 관련  ]
     UNSUPPORTED_OAUTH_PROVIDER(2000, false, "지원하지 않는 소셜 로그인 방식이에요."),

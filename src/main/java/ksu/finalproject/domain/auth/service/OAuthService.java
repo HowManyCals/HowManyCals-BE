@@ -17,7 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OAuthService {
 
-    private final List<OAuthProviderService> providerServices;
+    private final List<OAuthProviderService> providerServices; // implements 구현체 전부 주입
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
 

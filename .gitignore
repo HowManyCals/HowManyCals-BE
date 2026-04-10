@@ -44,3 +44,4 @@ docs
 ### 민감한 데이터 ###
 application.properties
 application.yml
+/private

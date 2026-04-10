@@ -9,6 +9,7 @@ import ksu.finalproject.domain.user.dto.SignInResponseDto;
 import ksu.finalproject.domain.user.dto.SignUpRequestDto;
 import ksu.finalproject.domain.user.dto.SignUpResponseDto;
 import ksu.finalproject.domain.user.dto.UpdateProfileRequestDto;
+import ksu.finalproject.domain.user.dto.UpdateProfileResponseDto;
 import ksu.finalproject.domain.user.service.UserService;
 import ksu.finalproject.domain.user.service.UserService.AuthTokens;
 import ksu.finalproject.global.common.CommonResponse;
@@ -56,14 +57,22 @@ public class UserController {
         return new CommonResponse<>(ResponseCode.SUCCESS_SIGNIN, tokens.response());
     }
 
-    // [PATCH - 추가 정보 입력]
+    // [PATCH - 추가 정보 입력 (프로필)]
     @PatchMapping("/profile")
-    public CommonResponse<?> updateProfile(@Valid @RequestBody UpdateProfileRequestDto request,
-                                           HttpServletRequest httpRequest) throws CustomException {
+    public CommonResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequestDto request,
+                                              HttpServletRequest httpRequest) throws CustomException {
         String token = httpRequest.getHeader("Authorization").substring(7);
         Long userId = jwtProvider.getUserId(token);
         userService.updateProfile(userId, request);
         return new CommonResponse<>(ResponseCode.SUCCESS_UPDATE_PROFILE);
+    }
+
+    // [GET - 프로필 조회]
+    @GetMapping("/profile")
+    public CommonResponse<UpdateProfileResponseDto> getProfile(HttpServletRequest httpRequest) throws CustomException {
+        String token = httpRequest.getHeader("Authorization").substring(7);
+        Long userId = jwtProvider.getUserId(token);
+        return new CommonResponse<>(ResponseCode.SUCCESS_GET_PROFILE, userService.getProfile(userId));
     }
 }
 

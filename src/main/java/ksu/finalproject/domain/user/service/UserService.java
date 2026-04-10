@@ -5,6 +5,7 @@ import ksu.finalproject.domain.user.dto.SignInResponseDto;
 import ksu.finalproject.domain.user.dto.SignUpRequestDto;
 import ksu.finalproject.domain.user.dto.SignUpResponseDto;
 import ksu.finalproject.domain.user.dto.UpdateProfileRequestDto;
+import ksu.finalproject.domain.user.dto.UpdateProfileResponseDto;
 import ksu.finalproject.domain.user.entity.Users;
 import ksu.finalproject.domain.user.entity.enums.AuthProvider;
 import ksu.finalproject.domain.user.repository.UserRepository;
@@ -74,10 +75,19 @@ public class UserService {
     /**
      * 회원가입 이후 추가 정보를 저장합니다.
      * JWT에서 추출한 userId로 유저를 조회하고, 닉네임 / 성별 / 키 / 체중 / 활동 수준을 업데이트합니다.
+     *
+     * @param userId  JWT에서 추출한 유저 ID
+     * @param request 닉네임, 성별, 키, 체중, 활동 수준을 담은 요청 DTO
      */
     public void updateProfile(Long userId, UpdateProfileRequestDto request) throws CustomException {
         Users user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ResponseCode.NOT_FOUND_USER));
+
+        // 본인 닉네임이 아닌 다른 유저가 동일 닉네임 사용 중이면 예외
+        boolean isDuplicated = userRepository.findByNickName(request.getNickname())
+                .filter(found -> !found.getId().equals(userId))
+                .isPresent();
+        if (isDuplicated) throw new CustomException(ResponseCode.DUPLICATED_NICKNAME);
 
         user.updateProfile(
                 request.getNickname(),
@@ -87,6 +97,25 @@ public class UserService {
                 request.getActivityLevel()
         );
         userRepository.save(user);
+    }
+
+    /**
+     * 유저의 프로필 정보를 조회합니다.
+     *
+     * @param userId JWT에서 추출한 유저 ID
+     * @return 닉네임, 성별, 키, 체중, 활동 수준을 담은 UpdateProfileResponseDto
+     */
+    public UpdateProfileResponseDto getProfile(Long userId) throws CustomException {
+        Users user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ResponseCode.NOT_FOUND_USER));
+
+        return new UpdateProfileResponseDto(
+                user.getNickName(),
+                user.getGender(),
+                user.getHeight(),
+                user.getWeight(),
+                user.getActivityLevel()
+        );
     }
 
     /**

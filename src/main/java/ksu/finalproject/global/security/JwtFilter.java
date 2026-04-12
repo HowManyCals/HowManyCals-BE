@@ -10,6 +10,8 @@ import ksu.finalproject.global.common.ResponseCode;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -25,6 +27,7 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final List<String> WHITELIST = List.of(
             "/user/signup",
             "/user/signin",
+            "/auth/refresh",
             "/status",
             "/h2-console/**"
     );
@@ -70,8 +73,16 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             String accessToken = getToken(request);
 
+            if (jwtProvider.isExpiredToken(accessToken))
+                throw new CustomException(ResponseCode.EXPIRED_TOKEN);
             if (!jwtProvider.isValidToken(accessToken))
                 throw new CustomException(ResponseCode.INVALID_TOKEN);
+
+            // 토큰 유효 -> SecurityContext에 인증 정보 세팅
+            Long userId = jwtProvider.getUserId(accessToken);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userId, null, List.of());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
             filterChain.doFilter(request, response);
 

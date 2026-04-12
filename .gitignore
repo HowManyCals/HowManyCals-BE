@@ -40,7 +40,9 @@ out/
 ### 프로젝트용 ###
 관련 자료
 docs
+/src/test
 
 ### 민감한 데이터 ###
 application.properties
 application.yml
+/private

@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<Users, Long>{
     // 이메일 값 = nullable이므로 Optional 추가
     Optional<Users> findByEmail(String email);
+    Optional<Users> findByRefreshToken(String refreshToken);
+    Optional<Users> findByNickName(String nickName);
 }

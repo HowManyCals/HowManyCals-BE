@@ -14,14 +14,34 @@ public enum ResponseCode {
     //endregion
     //region    [   1000번대: user 관련  ]
     SUCCESS_SIGNUP(1000, true, "회원가입에 성공했어요."),
-    SUCCESS_SIGNIN(1001, true, "로그인에 성공했어요."),
-    DUPLICATED_USER_EMAIL(1002, false, "이미 사용 중인 이메일이에요."),
-    NOT_FOUND_AUTHORIZATION(1003, false, "인증 헤더가 존재하지 않아요."),
-    INVALID_AUTHORIZATION(1004, false, "인증 헤더가 Bearer 방식이 아니에요."),
-    INVALID_TOKEN(1005, false, "유효하지 않은 토큰이에요."),
-    EXPIRED_TOKEN(1006, false, "만료된 토큰이에요."),
-    INVALID_USER_EMAIL(1007, false, "올바르지 않은 이메일이에요."),
-    INVALID_PASSWORD(1008, false, "올바르지 않은 패스워드예요.");
+    DUPLICATED_USER_EMAIL(1001, false, "이미 사용 중인 이메일이에요."),
+    NOT_FOUND_AUTHORIZATION(1002, false, "인증 헤더가 존재하지 않아요."),
+    INVALID_AUTHORIZATION(1003, false, "인증 헤더가 Bearer 방식이 아니에요."),
+    INVALID_TOKEN(1004, false, "유효하지 않은 토큰이에요."),
+    EXPIRED_TOKEN(1005, false, "만료된 토큰이에요."),
+    INVALID_USER_EMAIL(1006, false, "올바르지 않은 이메일이에요."),
+    INVALID_PASSWORD(1007, false, "올바르지 않은 패스워드예요."),
+    NOT_FOUND_USER(1008, false, "존재하지 않는 사용자예요."),
+    SUCCESS_UPDATE_PROFILE(1009, true, "추가 정보 입력에 성공했어요."),
+    SUCCESS_SIGNIN(1010, true, "로그인에 성공했어요."),
+    SUCCESS_REFRESH(1011, true, "토큰이 갱신되었어요."),
+    SUCCESS_GET_PROFILE(1012, true, "프로필 조회에 성공했어요."),
+    DUPLICATED_NICKNAME(1013, false, "이미 사용 중인 닉네임이에요."),
+    //endregion
+    //region    [   2000번대: OAuth 관련  ]
+    UNSUPPORTED_OAUTH_PROVIDER(2000, false, "지원하지 않는 소셜 로그인 방식이에요."),
+    OAUTH_TOKEN_EXCHANGE_FAILED(2001, false, "소셜 로그인 토큰 교환에 실패했어요."),
+    OAUTH_USER_INFO_FAILED(2002, false, "소셜 로그인 사용자 정보 조회에 실패했어요."),
+    SUCCESS_OAUTH_LOGIN(2003, true, "소셜 로그인에 성공했어요."),
+    //endregion
+    //region    [   3000번대: food 이미지 분석 관련  ]
+    SUCCESS_ANALYZE_FOOD_IMAGE(3000, true, "음식 이미지 분석에 성공했어요."),
+    EMPTY_FOOD_IMAGE(3001, false, "업로드할 음식 이미지가 없어요."),
+    UNSUPPORTED_FOOD_IMAGE_TYPE(3002, false, "지원하지 않는 음식 이미지 형식이에요."),
+    FOOD_IMAGE_SIZE_EXCEEDED(3003, false, "음식 이미지 크기가 너무 커요."),
+    FOOD_IMAGE_UPLOAD_FAILED(3004, false, "음식 이미지를 임시 저장하지 못했어요."),
+    AI_SERVER_REQUEST_FAILED(3005, false, "AI 서버 요청에 실패했어요."),
+    AI_SERVER_RESPONSE_INVALID(3006, false, "AI 서버 응답을 처리할 수 없어요.");
     //endregion
     private final Integer code;
     private final Boolean success;

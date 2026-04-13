@@ -1,11 +1,12 @@
 package ksu.finalproject.global.security;
 
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import ksu.finalproject.global.config.JwtProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import io.jsonwebtoken.*;
+
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
@@ -48,7 +49,7 @@ public class JwtProvider {
                 .compact();
     }
 
-    // 토큰 유효 검사
+    // 토큰 유효 검사 (서명 유효 + 만료되지 않음)
     public boolean isValidToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -59,5 +60,32 @@ public class JwtProvider {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    // 서명은 유효하나 만료된 토큰인지 확인
+    public boolean isExpiredToken(String token) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(this.key)
+                    .build()
+                    .parseClaimsJws(token);
+            return false;
+        } catch (ExpiredJwtException e) {
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 토큰에서 userId 추출
+    public Long getUserId(String token) {
+        return Long.parseLong(
+                Jwts.parserBuilder()
+                        .setSigningKey(this.key)
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody()
+                        .getSubject()
+        );
     }
 }

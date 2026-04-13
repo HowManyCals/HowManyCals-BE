@@ -1,23 +1,24 @@
 package ksu.finalproject.domain.user.controller;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import ksu.finalproject.domain.user.dto.SignInRequestDto;
 import ksu.finalproject.domain.user.dto.SignInResponseDto;
 import ksu.finalproject.domain.user.dto.SignUpRequestDto;
 import ksu.finalproject.domain.user.dto.SignUpResponseDto;
+import ksu.finalproject.domain.user.dto.UpdateProfileRequestDto;
+import ksu.finalproject.domain.user.dto.UpdateProfileResponseDto;
 import ksu.finalproject.domain.user.service.UserService;
 import ksu.finalproject.domain.user.service.UserService.AuthTokens;
 import ksu.finalproject.global.common.CommonResponse;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.config.JwtProperties;
+import ksu.finalproject.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/user")
@@ -26,16 +27,17 @@ public class UserController {
 
     private final UserService userService;
     private final JwtProperties jwtProperties;
+    private final JwtProvider jwtProvider;
 
     // [POST - 회원가입]
     @PostMapping("/signup")
     public CommonResponse<SignUpResponseDto> signUp(@Valid @RequestBody SignUpRequestDto request,
                                                     HttpServletResponse response) throws CustomException {
-        AuthTokens<SignUpResponseDto> tokens = userService.signUp(request); // 회원가입 시 토큰 발급
+        AuthTokens<SignUpResponseDto> tokens = userService.signUp(request);
         Cookie refreshCookie = new Cookie("refreshToken", tokens.refreshToken());
-        refreshCookie.setHttpOnly(true); // 브라우저에서 js 쿠키 접근 차단 (XSS 방지)
-        refreshCookie.setPath("/"); // 쿠키를 첨부할 엔드포인트 지정
-        refreshCookie.setMaxAge((int) (jwtProperties.getRefreshTokenExpiration() / 1000)); // 7일
+        refreshCookie.setHttpOnly(true);
+        refreshCookie.setPath("/");
+        refreshCookie.setMaxAge((int) (jwtProperties.getRefreshTokenExpiration() / 1000));
         response.addCookie(refreshCookie);
 
         return new CommonResponse<>(ResponseCode.SUCCESS_SIGNUP, tokens.response());
@@ -54,4 +56,23 @@ public class UserController {
 
         return new CommonResponse<>(ResponseCode.SUCCESS_SIGNIN, tokens.response());
     }
+
+    // [PATCH - 추가 정보 입력 (프로필)]
+    @PatchMapping("/profile")
+    public CommonResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequestDto request,
+                                              HttpServletRequest httpRequest) throws CustomException {
+        String token = httpRequest.getHeader("Authorization").substring(7);
+        Long userId = jwtProvider.getUserId(token);
+        userService.updateProfile(userId, request);
+        return new CommonResponse<>(ResponseCode.SUCCESS_UPDATE_PROFILE);
+    }
+
+    // [GET - 프로필 조회]
+    @GetMapping("/profile")
+    public CommonResponse<UpdateProfileResponseDto> getProfile(HttpServletRequest httpRequest) throws CustomException {
+        String token = httpRequest.getHeader("Authorization").substring(7);
+        Long userId = jwtProvider.getUserId(token);
+        return new CommonResponse<>(ResponseCode.SUCCESS_GET_PROFILE, userService.getProfile(userId));
+    }
 }
+

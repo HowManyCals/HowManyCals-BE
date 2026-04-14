@@ -57,7 +57,7 @@ public class FoodService {
         try {
             tempFile = storeTemporarily(image);
             FoodAnalyzeResponseDto response = aiServerClient.requestAnalysis(tempFile, image.getContentType(), log.getId());
-            log.acceptRequest(toJson(response));
+            log.success(toJson(response));
             aiAnalysisLogRepository.save(log);
             return response;
         } catch (CustomException e) {
@@ -140,11 +140,13 @@ public class FoodService {
             throw new CustomException(ResponseCode.FOOD_IMAGE_SIZE_EXCEEDED);
         }
 
+        // 파일 타입 검증
         String contentType = image.getContentType();
         if (!StringUtils.hasText(contentType) || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
             throw new CustomException(ResponseCode.UNSUPPORTED_FOOD_IMAGE_TYPE);
         }
 
+        // 확장자 검증
         String ext = getExtension(image.getOriginalFilename());
         if (!StringUtils.hasText(ext) || !ALLOWED_EXTENSIONS.contains(ext)) {
             throw new CustomException(ResponseCode.UNSUPPORTED_FOOD_IMAGE_TYPE);

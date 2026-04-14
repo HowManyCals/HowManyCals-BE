@@ -35,27 +35,21 @@ public class FoodController {
 	}
 
 	@PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<CommonResponse<FoodAnalyzeResponseDto>> analyzeFoodImage(@RequestPart("image") MultipartFile image,
-																				   Authentication authentication)
-			throws CustomException {
+	public ResponseEntity<CommonResponse<FoodAnalyzeResponseDto>> analyzeFoodImage(@RequestPart("image") MultipartFile image, Authentication authentication) throws CustomException {
 		FoodAnalyzeResponseDto response = foodService.analyzeFoodImage(image, extractUserId(authentication));
 		return ResponseEntity.status(HttpStatus.ACCEPTED) // Status: 202 -> 분석 요청 응답
 				.body(new CommonResponse<>(ResponseCode.SUCCESS_REQUEST_ANALYZE_FOOD_IMAGE, response));
 	}
 
 	@GetMapping("/analyze/{aiLogId}")
-	public CommonResponse<FoodAnalysisResultDto> getAnalysisResult(@PathVariable Long aiLogId,
-																   Authentication authentication)
-			throws CustomException {
+	public CommonResponse<FoodAnalysisResultDto> getAnalysisResult(@PathVariable Long aiLogId, Authentication authentication) throws CustomException {
 		FoodAnalysisResultDto response = foodService.getAnalysisResult(aiLogId, extractUserId(authentication));
 		return new CommonResponse<>(ResponseCode.SUCCESS_GET_FOOD_IMAGE_ANALYSIS, response);
 	}
 
 	// 분석 결과 SSE 구독 엔드포인트 -> 최대 3분
 	@GetMapping(value = "/analyze/{aiLogId}/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	public SseEmitter subscribeAnalysisResult(@PathVariable Long aiLogId,
-											  Authentication authentication)
-			throws CustomException {
+	public SseEmitter subscribeAnalysisResult(@PathVariable Long aiLogId, Authentication authentication) throws CustomException {
 		return foodService.subscribeToResult(aiLogId, extractUserId(authentication));
 	}
 

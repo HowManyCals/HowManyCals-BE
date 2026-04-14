@@ -30,7 +30,7 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/status", "/h2-console/**", "/api/ai/callback").permitAll()
+                        .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/status", "/h2-console/**", "/api/ai/callback").permitAll()
                     .anyRequest().authenticated()
             )
             // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 등록

@@ -26,8 +26,12 @@ public class AiAnalysisLog {
     @Column(name = "ai_log_id")
     private Long id;
 
+    
+    // AI 분석 로그(N) : 사용자 (1) 관계
+    // fetch = FetchType.LAZY -> AiAnalysisLog를 조회할 때 user 필드에 접근하는 시점에 필요한 쿼리 실행
+    // optional = false -> 필수 연관관계
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = false) // -> user 필드가 DB의 user_id 외래 키 컬럼과 매핑됨을 의미
     private Users user;
 
     @Column(name = "log_id")
@@ -55,7 +59,7 @@ public class AiAnalysisLog {
     private LocalDateTime createdAt;
 
     // AI 서버 접수 성공 -> rawOutput 저장, 상태를 PROCESSING으로 전환
-    public void acceptRequest(String rawOutput) {
+    public void success(String rawOutput) {
         this.rawOutput = rawOutput;
         this.analysisStatus = AnalysisStatus.PROCESSING;
     }

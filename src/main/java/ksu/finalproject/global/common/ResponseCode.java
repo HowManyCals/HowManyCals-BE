@@ -44,7 +44,11 @@ public enum ResponseCode {
     AI_SERVER_RESPONSE_INVALID(3006, false, "AI 서버 응답을 처리할 수 없어요."),
     SUCCESS_REQUEST_ANALYZE_FOOD_IMAGE(3007, true, "음식 이미지 분석 요청이 접수되었어요."),
     SUCCESS_GET_FOOD_IMAGE_ANALYSIS(3008, true, "음식 이미지 분석 상태 조회에 성공했어요."),
-    NOT_FOUND_FOOD_IMAGE_ANALYSIS(3009, false, "해당 음식 이미지 분석 요청을 찾을 수 없어요.");
+    NOT_FOUND_FOOD_IMAGE_ANALYSIS(3009, false, "해당 음식 이미지 분석 요청을 찾을 수 없어요."),
+    //endregion
+
+    //region [  9000번대: 서비스 내부 오류 관련  ]
+    INVALID_ENUM(9000, false, "올바르지 않은 요청 값이에요.");
     //endregion
     private final Integer code;
     private final Boolean success;

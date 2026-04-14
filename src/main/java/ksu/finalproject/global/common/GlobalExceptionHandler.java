@@ -1,6 +1,5 @@
 package ksu.finalproject.global.common;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -33,16 +32,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public CommonResponse<?> handleUnknownEnumException(HttpMessageNotReadableException e){
+    public CommonResponse<?> handleUnknownEnumException(HttpMessageNotReadableException e) {
         Throwable cause = e.getCause();
 
-        // Step 2: enum 변환 실패인지 체크
         if (cause instanceof InvalidFormatException invalidEx) {
 
             // enum 타입인지 확인
             if (invalidEx.getTargetType().isEnum()) {
 
-                // Step 3: 어떤 enum인지 + 허용 값 추출
+                // 어떤 enum인지 + 허용 값 추출
                 Class<?> enumClass = invalidEx.getTargetType();
                 Object[] enumConstants = enumClass.getEnumConstants();
 
@@ -50,11 +48,9 @@ public class GlobalExceptionHandler {
                         .map(Object::toString)
                         .collect(Collectors.joining(", "));
 
-                // Step 4: 에러 메시지 구성
                 String message = String.format(
                         "잘못된 enum 값이에요. 허용 값: [%s]",
-                        allowedValues
-                );
+                        allowedValues);
 
                 return new CommonResponse<>(ResponseCode.INVALID_ENUM, message);
             }
@@ -72,4 +68,3 @@ public class GlobalExceptionHandler {
         return new CommonResponse<>(ResponseCode.FOOD_IMAGE_SIZE_EXCEEDED);
     }
 }
-

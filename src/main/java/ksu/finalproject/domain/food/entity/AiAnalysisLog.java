@@ -26,7 +26,6 @@ public class AiAnalysisLog {
     @Column(name = "ai_log_id")
     private Long id;
 
-    
     // AI 분석 로그(N) : 사용자 (1) 관계
     // fetch = FetchType.LAZY -> AiAnalysisLog를 조회할 때 user 필드에 접근하는 시점에 필요한 쿼리 실행
     // optional = false -> 필수 연관관계

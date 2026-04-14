@@ -97,7 +97,7 @@ public class FoodService {
                 result.getModelVersion(),
                 toJson(result),
                 result.getInferenceTimeMs(),
-                parseStatus(result.getAnalysisStatus())
+                result.getAnalysisStatus()
         );
         aiAnalysisLogRepository.save(log);
 
@@ -194,7 +194,7 @@ public class FoodService {
 
         // 아직 처리 중인 경우 현재 상태 반환
         return FoodAnalysisResultDto.builder()
-                .analysisStatus(log.getAnalysisStatus().name())
+                .analysisStatus(log.getAnalysisStatus())
                 .modelVersion(log.getModelVersion())
                 .inferenceTimeMs(log.getInferenceTimeMs())
                 .aiLogId(log.getId())
@@ -206,15 +206,6 @@ public class FoodService {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
             throw new CustomException(ResponseCode.AI_SERVER_RESPONSE_INVALID);
-        }
-    }
-
-    private AnalysisStatus parseStatus(String status) {
-        if (!StringUtils.hasText(status)) return AnalysisStatus.FAILED;
-        try {
-            return AnalysisStatus.valueOf(status.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            return AnalysisStatus.FAILED;
         }
     }
 

@@ -5,10 +5,10 @@ import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -40,18 +40,18 @@ public class FoodSeedInitializer implements ApplicationRunner {
 
         List<Food> foods = loadFoods();
         if (foods.isEmpty()) {
-            log.warn("음식 시드가 비어있어요. 데이터 파일을 다시 한 번 확인해주세요.", FOOD_SEED_PATH);
+            log.warn("음식 시드가 비어있어요. 데이터 파일을 다시 한 번 확인해주세요. path={}", FOOD_SEED_PATH);
             return;
         }
 
         foodRepository.saveAll(foods);
-        log.info("성공적으로 음식 시드를 저장했어요.", foods.size());
+        log.info("성공적으로 음식 시드를 저장했어요. count={}", foods.size());
     }
 
     private List<Food> loadFoods() {
         ClassPathResource resource = new ClassPathResource(FOOD_SEED_PATH);
         if (!resource.exists()) {
-            log.warn("음식 시드 파일이 존재하지 않아요.", FOOD_SEED_PATH);
+            log.warn("음식 시드 파일이 존재하지 않아요. path={}", FOOD_SEED_PATH);
             return List.of();
         }
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))){

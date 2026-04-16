@@ -9,10 +9,12 @@ import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OAuthService {
@@ -37,6 +39,7 @@ public class OAuthService {
                 default -> throw new CustomException(ResponseCode.UNSUPPORTED_OAUTH_PROVIDER);
             };
         } catch (IllegalArgumentException e) {
+            log.warn("지원하지 않는 OAuth provider 요청 provider={}", provider);
             throw new CustomException(ResponseCode.UNSUPPORTED_OAUTH_PROVIDER);
         }
     }
@@ -46,7 +49,10 @@ public class OAuthService {
         return providerServices.stream()
                 .filter(s -> s.getProvider() == provider)
                 .findFirst()
-                .orElseThrow(() -> new CustomException(ResponseCode.UNSUPPORTED_OAUTH_PROVIDER));
+                .orElseThrow(() -> {
+                    log.warn("OAuth provider service 미구현 provider={}", provider);
+                    return new CustomException(ResponseCode.UNSUPPORTED_OAUTH_PROVIDER);
+                });
     }
 
     /**
@@ -54,10 +60,12 @@ public class OAuthService {
      * 프론트엔드는 해당 URL로 사용자를 리다이렉트합니다.
      *
      * @param provider OAuth provider 문자열 (예: kakao, google, naver)
-     * @return 해당 provider의 OAuth 인가 URL (예: kakao -> https://kauth.kakao.com/oauth/authorize?...)
+     * @return 해당 provider의 OAuth 인가 URL 문자열
      */
     public String getAuthorizationUrl(String provider) throws CustomException {
-        return getProviderService(parseProvider(provider)).getAuthorizationUrl();
+        AuthProvider authProvider = parseProvider(provider);
+        log.info("OAuth 인가 URL 조회 provider={}", authProvider);
+        return getProviderService(authProvider).getAuthorizationUrl();
     }
 
     /**
@@ -72,6 +80,8 @@ public class OAuthService {
         AuthProvider authProvider = parseProvider(provider);
         OAuthProviderService providerService = getProviderService(authProvider);
 
+        log.info("OAuth 콜백 처리 시작 provider={}", authProvider);
+
         // 1. code -> provider access token 교환
         String providerAccessToken = providerService.exchangeCodeForToken(code);
 
@@ -79,13 +89,16 @@ public class OAuthService {
         String email = providerService.getUserEmail(providerAccessToken);
 
         // 3. 이메일로 유저 조회, 없으면 신규 생성 (소셜 가입)
-        Users user = userRepository.findByEmail(email)
-                .orElseGet(() -> userRepository.save(
+        Users existingUser = userRepository.findByEmail(email).orElse(null);
+        boolean newUser = existingUser == null;
+        Users user = newUser
+                ? userRepository.save(
                         Users.builder()
                                 .email(email)
                                 .provider(authProvider)
                                 .build()
-                ));
+                )
+                : existingUser;
 
         // 4. JWT 발급
         String accessToken = jwtProvider.createAccessToken(user.getId());
@@ -93,6 +106,25 @@ public class OAuthService {
         user.updateRefreshToken(refreshToken);
         userRepository.save(user);
 
+        log.info("OAuth 콜백 처리 성공 provider={}, userId={}, newUser={}, email={}",
+                authProvider,
+                user.getId(),
+                newUser,
+                maskEmail(email));
+
         return new AuthTokens<>(new SignInResponseDto(accessToken), refreshToken);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "unknown";
+        }
+
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***";
+        }
+
+        return email.substring(0, 2) + "***" + email.substring(atIndex);
     }
 }

@@ -37,7 +37,10 @@ public class AnalysisSseService {
 
         SseEmitter previous = emitters.put(aiLogId, emitter);
         if (previous != null) {
+            log.info("기존 SSE 연결 종료 후 신규 구독 등록 aiLogId={}", aiLogId);
             previous.complete(); // 기존 연결 정리
+        } else {
+            log.info("SSE 구독 등록 aiLogId={}", aiLogId);
         }
 
         return emitter;
@@ -49,7 +52,10 @@ public class AnalysisSseService {
      */
     public void emit(Long aiLogId, Object data) {
         SseEmitter emitter = emitters.remove(aiLogId);
-        if (emitter == null) return;
+        if (emitter == null) {
+            log.info("SSE 전송 생략 - 활성 연결 없음 aiLogId={}", aiLogId);
+            return;
+        }
 
         try {
             emitter.send(
@@ -58,6 +64,7 @@ public class AnalysisSseService {
                             .data(data, MediaType.APPLICATION_JSON)
             );
             emitter.complete();
+            log.info("SSE 전송 완료 aiLogId={}", aiLogId);
         } catch (IOException e) {
             log.warn("SSE 전송 실패 aiLogId={}: {}", aiLogId, e.getMessage());
             emitter.completeWithError(e);

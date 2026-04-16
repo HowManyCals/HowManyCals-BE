@@ -8,6 +8,7 @@ import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.config.OAuthProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class KakaoOAuthService implements OAuthProviderService {
 
@@ -40,6 +42,8 @@ public class KakaoOAuthService implements OAuthProviderService {
     public String exchangeCodeForToken(String code) throws CustomException {
         OAuthProperties.ProviderConfig config = oAuthProperties.getKakao();
 
+        log.info("Kakao OAuth 토큰 교환 시작");
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
@@ -56,10 +60,15 @@ public class KakaoOAuthService implements OAuthProviderService {
                     new HttpEntity<>(params, headers),
                     OAuthTokenResponseDto.class
             );
-            if (response == null || response.getAccessToken() == null)
+            if (response == null || response.getAccessToken() == null) {
+                log.warn("Kakao OAuth 토큰 교환 실패 - accessToken 누락");
                 throw new CustomException(ResponseCode.OAUTH_TOKEN_EXCHANGE_FAILED);
+            }
+
+            log.info("Kakao OAuth 토큰 교환 성공");
             return response.getAccessToken();
         } catch (RestClientException e) {
+            log.error("Kakao OAuth 토큰 교환 예외", e);
             throw new CustomException(ResponseCode.OAUTH_TOKEN_EXCHANGE_FAILED);
         }
     }
@@ -68,6 +77,8 @@ public class KakaoOAuthService implements OAuthProviderService {
     public String getUserEmail(String accessToken) throws CustomException {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
+
+        log.info("Kakao 사용자 이메일 조회 시작");
 
         try {
             KakaoUserInfoDto userInfo = restTemplate.exchange(
@@ -78,11 +89,16 @@ public class KakaoOAuthService implements OAuthProviderService {
             ).getBody();
 
             if (userInfo == null || userInfo.getKakaoAccount() == null
-                    || userInfo.getKakaoAccount().getEmail() == null)
+                    || userInfo.getKakaoAccount().getEmail() == null) {
+                log.warn("Kakao 사용자 이메일 조회 실패 - 이메일 누락");
                 throw new CustomException(ResponseCode.OAUTH_USER_INFO_FAILED);
+            }
+
+            log.info("Kakao 사용자 이메일 조회 성공");
 
             return userInfo.getKakaoAccount().getEmail();
         } catch (RestClientException e) {
+            log.error("Kakao 사용자 이메일 조회 예외", e);
             throw new CustomException(ResponseCode.OAUTH_USER_INFO_FAILED);
         }
     }

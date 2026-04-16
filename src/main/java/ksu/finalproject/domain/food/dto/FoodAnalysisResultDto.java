@@ -24,6 +24,7 @@ public class FoodAnalysisResultDto {
     @JsonProperty("inference_time_ms")
     private Long inferenceTimeMs;
 
+    @JsonProperty("candidates")
     @Builder.Default
     private List<FoodAnalyzeCandidateDto> candidates = Collections.emptyList();
 
@@ -33,4 +34,3 @@ public class FoodAnalysisResultDto {
     @JsonProperty("ai_log_id")
     private Long aiLogId;
 }
-

@@ -5,6 +5,7 @@ import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.config.AiServerProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpEntity;
@@ -27,6 +28,7 @@ import java.util.Map;
  * 이미지 분석 요청 전송 / 응답 파싱 책임만 가집니다.
  */
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class AiServerRequestService {
 
@@ -43,8 +45,11 @@ public class AiServerRequestService {
      */
     public FoodAnalyzeResponseDto requestAnalysis(Path imageFile, String contentType, Long aiLogId) throws CustomException {
         if (!StringUtils.hasText(aiServerProperties.getAnalyzeUrl())) {
+            log.warn("AI 서버 요청 실패 - analyzeUrl 미설정 aiLogId={}", aiLogId);
             throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
         }
+
+        log.info("AI 서버 분석 요청 시작 aiLogId={}, analyzeUrl={}, contentType={}", aiLogId, aiServerProperties.getAnalyzeUrl(), contentType);
 
         try {
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
@@ -55,11 +60,14 @@ public class AiServerRequestService {
             );
 
             if (!response.getStatusCode().is2xxSuccessful()) {
+                log.warn("AI 서버 응답 상태 비정상 aiLogId={}, statusCode={}", aiLogId, response.getStatusCode());
                 throw new CustomException(ResponseCode.AI_SERVER_RESPONSE_INVALID);
             }
 
+            log.info("AI 서버 분석 요청 성공 aiLogId={}, statusCode={}", aiLogId, response.getStatusCode());
             return toResponseDto(response.getBody(), aiLogId);
         } catch (RestClientException e) {
+            log.error("AI 서버 분석 요청 예외 aiLogId={}, analyzeUrl={}", aiLogId, aiServerProperties.getAnalyzeUrl(), e);
             throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
         }
     }

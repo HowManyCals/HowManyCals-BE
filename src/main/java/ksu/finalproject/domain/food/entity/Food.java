@@ -26,7 +26,11 @@ public class Food {
     @Column(name = "food_name", nullable = false)
     private String foodName;
 
-    // 기준 제공 단위 (BOWL: 공기, SERVING: 인분, PIECE: 조각, CUP: 컵)
+    // 기준 제공 수량 (예: 1, 2, 3, 0.5)
+    @Column(name = "serving_amount", nullable = false)
+    private String servingAmount;
+
+    // 기준 제공 단위 (예: BOWL=공기, SERVING=인분, SIDE_DISH_BOWL=반찬그릇)
     @Enumerated(EnumType.STRING)
     @Column(name = "serving_unit", nullable = false)
     private ServingUnit servingUnit;
@@ -49,7 +53,7 @@ public class Food {
 
     // 음식 비활성화 여부 -> 데이터 삭제 없이 비활성화 처리
     @Column(name = "is_active", nullable = false)
-    @Builder.Default
+    @Builder.Default // builder 패턴 사용 시 기본값을 true로 처리
     private Boolean isActive = true;
 
     @CreatedDate

@@ -28,7 +28,7 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
-public class AiServerClient {
+public class AiServerRequestService {
 
     private final RestTemplate restTemplate;
     private final AiServerProperties aiServerProperties;

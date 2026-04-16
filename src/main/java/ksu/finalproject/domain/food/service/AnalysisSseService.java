@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 @Slf4j
 @Component
-public class AnalysisEventEmitter {
+public class AnalysisSseService {
 
     private static final long SSE_TIMEOUT_MS = 3 * 60 * 1000L; // 3분
 

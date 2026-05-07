@@ -50,6 +50,9 @@ public class Users {
     @Column(name = "activity_level") // 추천 알고리즘에 쓰일 활동 수준
     private ActivityLevel activityLevel;
 
+    @Column(name = "age")
+    private Integer age;
+
     @Column(name = "refresh_token")
     private String refreshToken;
 
@@ -58,12 +61,13 @@ public class Users {
         this.refreshToken = token;
     }
 
-    public void updateProfile(String nickName, Gender gender, Integer height, Integer weight, ActivityLevel activityLevel) {
+    public void updateProfile(String nickName, Gender gender, Integer height, Integer weight, ActivityLevel activityLevel, Integer age) {
         this.nickName = nickName;
         this.gender = gender;
         this.height = height;
         this.weight = weight;
         this.activityLevel = activityLevel;
+        this.age = age;
     }
 
     @CreatedDate // 자동으로 기재

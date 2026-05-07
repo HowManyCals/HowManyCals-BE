@@ -13,5 +13,6 @@ public class UpdateProfileResponseDto {
     private Integer height;
     private Integer weight;
     private ActivityLevel activityLevel;
+    private Integer age;
 }
 

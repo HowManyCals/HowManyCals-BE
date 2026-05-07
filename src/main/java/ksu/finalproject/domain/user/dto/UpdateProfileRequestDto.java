@@ -28,5 +28,10 @@ public class UpdateProfileRequestDto {
 
     @NotNull(message = "활동 수준은 필수 입력 항목이에요.")
     private ActivityLevel activityLevel;
+
+    @NotNull(message = "나이는 필수 입력 항목이에요.")
+    @Min(value = 1, message = "나이는 1세 이상으로 입력해주세요.")
+    @Max(value = 120, message = "나이는 120세 이하로 입력해주세요.")
+    private Integer age;
 }
 

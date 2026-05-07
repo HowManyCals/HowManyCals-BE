@@ -15,6 +15,12 @@ public class OAuthProperties {
     private ProviderConfig google = new ProviderConfig();
     private ProviderConfig naver = new ProviderConfig();
 
+    /**
+     * OAuth 콜백 성공 후 모바일 앱으로 리다이렉트할 딥링크 스킴
+     * 예: howmanycals://auth
+     */
+    private String deepLink;
+
     @Getter
     @Setter
     public static class ProviderConfig {
@@ -23,4 +29,3 @@ public class OAuthProperties {
         private String redirectUri;
     }
 }
-

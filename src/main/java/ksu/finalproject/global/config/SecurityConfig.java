@@ -1,5 +1,6 @@
 package ksu.finalproject.global.config;
 
+import jakarta.servlet.DispatcherType;
 import tools.jackson.databind.ObjectMapper;
 import ksu.finalproject.global.security.JwtFilter;
 import org.springframework.context.annotation.Bean;
@@ -30,7 +31,12 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/status", "/h2-console/**", "/api/ai/callback").permitAll()
+                        // SSE/비동기 컨트롤러 사용 시, 응답 완료/타임아웃 시점에
+                        // Tomcat이 ASYNC dispatch를 발생시키며 SecurityFilterChain을 다시 탄다.
+                        // 이때 별도 스레드라 SecurityContext가 비어있어 AccessDenied가 발생하므로,
+                        // ASYNC/FORWARD/ERROR dispatch는 무조건 통과시킨다.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/auth/refresh", "/status", "/h2-console/**", "/api/ai/callback", "/error").permitAll()
                     .anyRequest().authenticated()
             )
             // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 등록

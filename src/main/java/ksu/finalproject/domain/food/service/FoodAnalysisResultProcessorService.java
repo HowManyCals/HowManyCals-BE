@@ -43,8 +43,7 @@ public class FoodAnalysisResultProcessorService {
                         Food::getFoodName,
                         food -> food,
                         (first, second) -> first,
-                        LinkedHashMap::new
-                ));
+                        LinkedHashMap::new));
 
         List<FoodAnalyzeCandidateDto> processedCandidates = candidates.stream()
                 .map(candidate -> processCandidate(candidate, foodsByName.get(candidate.getFoodName())))
@@ -97,4 +96,3 @@ public class FoodAnalysisResultProcessorService {
         return null;
     }
 }
-

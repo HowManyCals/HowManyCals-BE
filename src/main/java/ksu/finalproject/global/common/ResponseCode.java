@@ -54,6 +54,17 @@ public enum ResponseCode {
     NOT_FOUND_FOOD_RECORD(4003, false, "해당 식사 기록을 찾을 수 없어요."),
     SUCCESS_DELETE_FOOD_RECORD(4004, true, "식사 기록이 삭제되었어요."),
     //endregion
+
+    //region [  5000번대: weight 관련  ]
+    SUCCESS_SAVE_WEIGHT_RECORD(5000, true, "체중이 기록되었어요."),
+    SUCCESS_SAVE_WEIGHT_GOAL(5001, true, "목표 체중이 설정되었어요."),
+    SUCCESS_GET_WEIGHT_SUMMARY(5002, true, "체중 정보 조회에 성공했어요."),
+    NOT_FOUND_WEIGHT_RECORD(5003, false, "체중 기록을 찾을 수 없어요."),
+    SUCCESS_GET_WEIGHT_RECORDS(5004, true, "체중 이력 조회에 성공했어요."),
+    ALREADY_EXIST_WEIGHT_RECORD(5005, false, "해당 날짜에 이미 체중 기록이 있어요."),
+    //endregion
+
+
     //region [  9000번대: 서비스 내부 오류 관련  ]
     INVALID_ENUM(9000, false, "올바르지 않은 요청 값이에요.");
     //endregion

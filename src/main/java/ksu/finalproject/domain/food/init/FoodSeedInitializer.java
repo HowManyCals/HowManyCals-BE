@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FoodSeedInitializer implements ApplicationRunner {
 
-    private static final String FOOD_SEED_PATH = "seed/3modified_db.csv";
+    private static final String FOOD_SEED_PATH = "seed/foodDB.csv";
     private static final String EXPECTED_HEADER =
             "food_name,main_category,sub_category,detail_category," +
                     "base_weight,base_unit,base_kcal,carbs,protein,fat," +

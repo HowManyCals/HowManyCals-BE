@@ -47,6 +47,13 @@ public enum ResponseCode {
     NOT_FOUND_FOOD_IMAGE_ANALYSIS(3009, false, "해당 음식 이미지 분석 요청을 찾을 수 없어요."),
     //endregion
 
+    //region    [   4000번대: food record 관련  ]
+    SUCCESS_SAVE_FOOD_RECORD(4000, true, "식사 기록이 저장되었어요."),
+    SUCCESS_GET_DAILY_FOOD_RECORD(4001, true, "일별 식사 기록 조회에 성공했어요."),
+    SUCCESS_GET_MONTHLY_CALENDAR(4002, true, "월별 캘린더 조회에 성공했어요."),
+    NOT_FOUND_FOOD_RECORD(4003, false, "해당 식사 기록을 찾을 수 없어요."),
+    SUCCESS_DELETE_FOOD_RECORD(4004, true, "식사 기록이 삭제되었어요."),
+    //endregion
     //region [  9000번대: 서비스 내부 오류 관련  ]
     INVALID_ENUM(9000, false, "올바르지 않은 요청 값이에요.");
     //endregion

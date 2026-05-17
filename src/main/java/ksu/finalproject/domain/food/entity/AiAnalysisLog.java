@@ -33,17 +33,13 @@ public class AiAnalysisLog {
     @JoinColumn(name = "user_id", nullable = false) // -> user 필드가 DB의 user_id 외래 키 컬럼과 매핑됨을 의미
     private Users user;
 
-    @Column(name = "log_id")
-    private Long logId;
-
     @Column(name = "image_url")
     private String imageUrl;
 
     @Column(name = "model_version")
     private String modelVersion;
 
-    @Lob // Large Object => 대용량 데이터
-    @Column(name = "raw_output")
+    @Column(name = "raw_output", columnDefinition = "LONGTEXT")
     private String rawOutput;
 
     @Column(name = "inference_time_ms")

@@ -71,7 +71,7 @@ public class Users {
     }
 
     @CreatedDate // 자동으로 기재
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate // 자동으로 기재

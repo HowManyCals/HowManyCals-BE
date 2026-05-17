@@ -21,10 +21,7 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("food_name")
     private String foodName;
 
-    @JsonProperty("serving_unit") // 공기, 인분, 그릇 등
-    private ServingUnit servingUnit;
-
-    @JsonProperty("serving_unit_label") // 1공기, 2공기에서의 1, 2 같은 수량을 의미
-    private String servingUnitLabel; // 소, 중, 대의 표현을 고려하여 string으로 지정
+    @JsonProperty("serving_unit_label") // 900g, 200ml 이런 식으로 내려줌
+    private String servingUnitLabel;
 }
 

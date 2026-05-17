@@ -1,11 +1,13 @@
 package ksu.finalproject.domain.food.entity;
 
+import ch.qos.logback.core.util.StringUtil;
 import jakarta.persistence.*;
 import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -26,30 +28,51 @@ public class Food {
     @Column(name = "food_name", nullable = false)
     private String foodName;
 
+    @Column(name = "main_category")
+    private String mainCategory; // 예 : 면 및 만두
+
+    @Column(name = "sub_category")
+    private String subCategory; // 예 : 칼국수
+
+    @Column(name = "detail_category")
+    private String detailCategory; // 예 : 바지락
+
+    public String getDisplayName(){
+        if (StringUtils.hasText(detailCategory)) return detailCategory + " " + subCategory; // 예 : 바지락 칼국수
+        return subCategory; // 예 : 칼국수
+    }
+
     // 기준 제공 수량 (예: 1, 2, 3, 0.5)
-    @Column(name = "serving_amount", nullable = false)
-    private String servingAmount;
+    @Column(name = "base_weight", nullable = false)
+    private Double baseWeight; // 100 (고정임. 영양성분함량기준)
 
-    // 기준 제공 단위 (예: BOWL=공기, SERVING=인분, SIDE_DISH_BOWL=반찬그릇)
     @Enumerated(EnumType.STRING)
-    @Column(name = "serving_unit", nullable = false)
-    private ServingUnit servingUnit;
+    @Column(name = "base_unit", nullable = false)
+    private ServingUnit baseUnit;   // g, ml
 
-    // 기준 제공량 무게 (g)
-    @Column(name = "serving_weight_g", nullable = false)
-    private Double servingWeightG;
+    @Column(name = "base_kcal", nullable = false)
+    private Double baseKcal; // 100g 기준 칼로리
 
-    @Column(name = "calories", nullable = false)
-    private Double calories;
-
-    @Column(name = "carbohydrate", nullable = false)
+    // 영양성분이 비어있는 항목이 존재할 수 있으므로, nullable은 true로 처리
+    @Column(name = "carbohydrate")
     private Double carbohydrate;
 
-    @Column(name = "protein", nullable = false)
+    @Column(name = "protein")
     private Double protein;
 
-    @Column(name = "fat", nullable = false)
+    @Column(name = "fat")
     private Double fat;
+
+    // 1인분 기준
+    @Column(name = "serving_weight", nullable = false)
+    private Double servingWeight;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "serving_unit", nullable = false)
+    private ServingUnit servingUnit; // g, ml
+
+    @Column(name = "serving_kcal", nullable = false)
+    private Double servingKcal;
 
     // 음식 비활성화 여부 -> 데이터 삭제 없이 비활성화 처리
     @Column(name = "is_active", nullable = false)
@@ -57,7 +80,7 @@ public class Food {
     private Boolean isActive = true;
 
     @CreatedDate
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate

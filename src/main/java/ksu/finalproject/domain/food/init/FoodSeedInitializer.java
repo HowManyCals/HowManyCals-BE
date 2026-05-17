@@ -25,13 +25,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FoodSeedInitializer implements ApplicationRunner {
 
-    private static final String FOOD_SEED_PATH = "seed/foods.csv";
-    private static final String EXPECTED_HEADER = "food_name,serving_unit,serving_unit_label,serving_weight_g,calories,carbohydrate,protein,fat,is_active";
+    private static final String FOOD_SEED_PATH = "seed/3modified_db.csv";
+    private static final String EXPECTED_HEADER =
+            "food_name,main_category,sub_category,detail_category," +
+                    "base_weight,base_unit,base_kcal,carbs,protein,fat," +
+                    "serving_weight,serving_unit,serving_kcal";
+    private static final int EXPECTED_COLUMN_COUNT = 13;
 
     private final FoodRepository foodRepository;
 
     @Override
-    @Transactional // 에러나면 rollback + 성공하면 commit
+    @Transactional
     public void run(@NonNull ApplicationArguments args) {
         if (foodRepository.count() > 0) {
             log.info("이미 음식 시드가 있어요.");
@@ -40,25 +44,25 @@ public class FoodSeedInitializer implements ApplicationRunner {
 
         List<Food> foods = loadFoods();
         if (foods.isEmpty()) {
-            log.warn("음식 시드가 비어있어요. 데이터 파일을 다시 한 번 확인해주세요. path={}", FOOD_SEED_PATH);
+            log.warn("음식 시드가 비어있어요. path={}", FOOD_SEED_PATH);
             return;
         }
 
         foodRepository.saveAll(foods);
-        log.info("성공적으로 음식 시드를 저장했어요. count={}", foods.size());
+        log.info("음식 시드 저장 완료. count={}", foods.size());
     }
 
     private List<Food> loadFoods() {
         ClassPathResource resource = new ClassPathResource(FOOD_SEED_PATH);
         if (!resource.exists()) {
-            log.warn("음식 시드 파일이 존재하지 않아요. path={}", FOOD_SEED_PATH);
+            log.warn("음식 시드 파일이 없어요. path={}", FOOD_SEED_PATH);
             return List.of();
         }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))){
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
             return parseCsv(reader);
-        }
-        catch (IOException e) {
-            throw new IllegalStateException("음식 시드 파일에 접근할 수 없어요 : " + FOOD_SEED_PATH, e);
+        } catch (IOException e) {
+            throw new IllegalStateException("음식 시드 파일 접근 실패: " + FOOD_SEED_PATH, e);
         }
     }
 
@@ -72,12 +76,8 @@ public class FoodSeedInitializer implements ApplicationRunner {
             lineNumber++;
             String trimmed = line.trim();
 
-            // 공백 예외
-            if (!StringUtils.hasText(trimmed) || trimmed.startsWith("#")) {
-                continue;
-            }
+            if (!StringUtils.hasText(trimmed) || trimmed.startsWith("#")) continue;
 
-            // 헤더 예외
             if (!headerChecked) {
                 validateHeader(trimmed);
                 headerChecked = true;
@@ -85,7 +85,11 @@ public class FoodSeedInitializer implements ApplicationRunner {
             }
 
             List<String> columns = splitCsvLine(line);
-            if (columns.size() != 9) throw new IllegalStateException("음식 시드 파일의 컬럼 수가 9개가 아니에요. - line " + lineNumber);
+            if (columns.size() != EXPECTED_COLUMN_COUNT) {
+                throw new IllegalStateException(
+                        "컬럼 수가 " + EXPECTED_COLUMN_COUNT + "개가 아니에요. line=" + lineNumber
+                                + " actual=" + columns.size());
+            }
 
             foods.add(toFood(columns, lineNumber));
         }
@@ -94,38 +98,37 @@ public class FoodSeedInitializer implements ApplicationRunner {
     }
 
     private void validateHeader(String header) {
-        String normalizedHeader = header.startsWith("\uFEFF") ? header.substring(1) : header;
-        if (!EXPECTED_HEADER.equals(normalizedHeader)) throw new IllegalStateException("음식 시드 헤더가 올바르지 않아요.");
+        String normalized = header.startsWith("\uFEFF") ? header.substring(1) : header;
+        if (!EXPECTED_HEADER.equals(normalized.trim()))
+            throw new IllegalStateException("음식 시드 헤더가 올바르지 않아요.");
     }
 
     private Food toFood(List<String> columns, int lineNumber) {
         try {
-            ServingUnit servingUnit = ServingUnit.extractUnit(columns.get(1).trim());
-            String servingAmount = columns.get(2);
-
-            if (!StringUtils.hasText(servingAmount)) throw new IllegalArgumentException("serving_unit_label 값이 비어 있어요.");
-
             return Food.builder()
                     .foodName(columns.get(0).trim())
-                    .servingAmount(servingAmount)
-                    .servingUnit(servingUnit)
-                    .servingWeightG(Double.parseDouble(columns.get(3).trim()))
-                    .calories(Double.parseDouble(columns.get(4).trim()))
-                    .carbohydrate(Double.parseDouble(columns.get(5).trim()))
-                    .protein(Double.parseDouble(columns.get(6).trim()))
-                    .fat(Double.parseDouble(columns.get(7).trim()))
-                    .isActive(parseBoolean(columns.get(8).trim()))
+                    .mainCategory(columns.get(1).trim())
+                    .subCategory(columns.get(2).trim())
+                    .detailCategory(columns.get(3).trim())
+                    .baseWeight(Double.parseDouble(columns.get(4).trim()))
+                    .baseUnit(ServingUnit.from(columns.get(5).trim()))
+                    .baseKcal(Double.parseDouble(columns.get(6).trim()))
+                    .carbohydrate(parseNullableDouble(columns.get(7).trim()))  // null 가능
+                    .protein(parseNullableDouble(columns.get(8).trim()))
+                    .fat(parseNullableDouble(columns.get(9).trim()))           // null 가능
+                    .servingWeight(Double.parseDouble(columns.get(10).trim()))
+                    .servingUnit(ServingUnit.from(columns.get(11).trim()))
+                    .servingKcal(Double.parseDouble(columns.get(12).trim()))
                     .build();
+
         } catch (Exception e) {
-            throw new IllegalStateException("음식 시드 변환 과정에 문제가 생겼어요. - line " + lineNumber, e);
+            throw new IllegalStateException("음식 시드 변환 실패. line=" + lineNumber, e);
         }
     }
 
-    private Boolean parseBoolean(String value) {
-        if (!StringUtils.hasText(value)) return true;
-        if ("true".equalsIgnoreCase(value)) return true;
-        if ("false".equalsIgnoreCase(value)) return false;
-        throw new IllegalArgumentException("is_active 값은 true 또는 false여야해요.");
+    private Double parseNullableDouble(String value) {
+        if (!StringUtils.hasText(value)) return null;
+        return Double.parseDouble(value);
     }
 
     private List<String> splitCsvLine(String line) {

@@ -3,7 +3,6 @@ package ksu.finalproject.domain.food.service;
 import ksu.finalproject.domain.food.dto.FoodAnalyzeCandidateDto;
 import ksu.finalproject.domain.food.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.food.entity.Food;
-import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,9 +16,6 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class FoodAnalysisResultProcessorService {
-
-    private static final String DEFAULT_SERVING_AMOUNT = "1";
-
     private final FoodRepository foodRepository;
 
     public FoodAnalysisResultDto process(FoodAnalysisResultDto result) {
@@ -64,35 +60,21 @@ public class FoodAnalysisResultProcessorService {
             return null;
         }
 
-        ServingUnit servingUnit = resolveServingUnit(candidate, food);
-        String servingUnitLabel = resolveServingUnitLabel(candidate, food, servingUnit);
+        String servingUnitLabel = resolveServingUnitLabel(candidate, food);
 
         return FoodAnalyzeCandidateDto.builder()
                 .aiModelIndex(candidate.getAiModelIndex())
                 .confidenceScore(candidate.getConfidenceScore())
                 .foodName(candidate.getFoodName())
-                .servingUnit(servingUnit)
                 .servingUnitLabel(servingUnitLabel)
                 .build();
     }
 
-    private ServingUnit resolveServingUnit(FoodAnalyzeCandidateDto candidate, Food food) {
-        if (food != null && food.getServingUnit() != null) {
-            return food.getServingUnit();
-        }
-        return candidate.getServingUnit();
-    }
-
-    private String resolveServingUnitLabel(FoodAnalyzeCandidateDto candidate, Food food, ServingUnit servingUnit) {
-        if (food != null && food.getServingUnit() != null) {
-            return food.getServingUnit().toDisplayLabel(food.getServingAmount());
-        }
-        if (StringUtils.hasText(candidate.getServingUnitLabel())) { //
+    private String resolveServingUnitLabel(FoodAnalyzeCandidateDto candidate, Food food) {
+        if (food != null && food.getServingUnit() != null)
+            return food.getServingUnit().toDisplayLabel(food.getServingWeight());
+        if (StringUtils.hasText(candidate.getServingUnitLabel()))
             return candidate.getServingUnitLabel();
-        }
-        if (servingUnit != null) { // 제공 기준이 없을 경우
-            return servingUnit.toDisplayLabel(DEFAULT_SERVING_AMOUNT);
-        }
         return null;
     }
 }

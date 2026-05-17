@@ -18,6 +18,7 @@ import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.config.JwtProperties;
 import ksu.finalproject.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -60,19 +61,24 @@ public class UserController {
     // [PATCH - 추가 정보 입력 (프로필)]
     @PatchMapping("/profile")
     public CommonResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequestDto request,
-                                              HttpServletRequest httpRequest) throws CustomException {
-        String token = httpRequest.getHeader("Authorization").substring(7);
-        Long userId = jwtProvider.getUserId(token);
+                                             Authentication authentication) throws CustomException {
+        Long userId = extractUserId(authentication);
         userService.updateProfile(userId, request);
         return new CommonResponse<>(ResponseCode.SUCCESS_UPDATE_PROFILE);
     }
 
     // [GET - 프로필 조회]
     @GetMapping("/profile")
-    public CommonResponse<UpdateProfileResponseDto> getProfile(HttpServletRequest httpRequest) throws CustomException {
-        String token = httpRequest.getHeader("Authorization").substring(7);
-        Long userId = jwtProvider.getUserId(token);
+    public CommonResponse<UpdateProfileResponseDto> getProfile(Authentication authentication) throws CustomException {
+        Long userId = extractUserId(authentication);
         return new CommonResponse<>(ResponseCode.SUCCESS_GET_PROFILE, userService.getProfile(userId));
+    }
+
+    private Long extractUserId(Authentication authentication) throws CustomException {
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)) {
+            throw new CustomException(ResponseCode.UNAUTHORIZED);
+        }
+        return userId;
     }
 }
 

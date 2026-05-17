@@ -151,17 +151,17 @@ public class FoodRecordService {
     public void deleteRecord(Long recordId, Long userId) throws CustomException {
         FoodRecord record = foodRecordRepository.findById(recordId)
                 .orElseThrow(() -> {
-                    log.warn("식사 기록 삭제 실패 - 기록 없음 recordId={}", recordId);
+                    log.warn("식사 기록 삭제 실패 - 기록  recordId={}", recordId);
                     return new CustomException(ResponseCode.NOT_FOUND_FOOD_RECORD);
                 });
-
         if (!record.getUser().getId().equals(userId)) {
-            log.warn("식사 기록 삭제 실패 - 권한 없음 recordId={}, requestUserId={}", recordId, userId);
+            log.warn("식사 기록 삭제 실패 - 권한이 없습니다. recordId={}, requestUserId={}", recordId, userId);
             throw new CustomException(ResponseCode.FORBIDDEN);
         }
 
-        foodRecordRepository.delete(record);
-        log.info("식사 기록 삭제 완료 userId={}, recordId={}", userId, recordId);
+        record.deActivate();
+
+        log.info("식사 기록 비활성화 완료 userId={]", userId);
     }
 
     private Users findUser(Long userId) throws CustomException {

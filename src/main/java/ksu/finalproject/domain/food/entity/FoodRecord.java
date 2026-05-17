@@ -70,6 +70,11 @@ public class FoodRecord {
     private LocalDateTime createdAt;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default // Builder는 내부적으로 필드 초기화를 무시하므로, isActive 값 무시하지 않도록 지정
     private Boolean isActive;
+
+    public void deActivate() {
+        this.isActive = false;
+    }
 }
 

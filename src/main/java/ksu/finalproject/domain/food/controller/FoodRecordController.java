@@ -71,7 +71,7 @@ public class FoodRecordController {
      * DELETE /food/record/{recordId}
      */
     @DeleteMapping("/{recordId}")
-    public CommonResponse<?> deleteRecord(
+    public CommonResponse<Void> deleteRecord(
             @PathVariable Long recordId,
             Authentication authentication) throws CustomException {
         foodRecordService.deleteRecord(recordId, extractUserId(authentication));

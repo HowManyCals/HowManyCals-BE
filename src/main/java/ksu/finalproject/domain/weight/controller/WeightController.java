@@ -3,7 +3,6 @@ package ksu.finalproject.domain.weight.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import ksu.finalproject.domain.weight.dto.WeightGoalSaveRequestDto;
 import ksu.finalproject.domain.weight.dto.WeightRecordSaveRequestDto;
 import ksu.finalproject.domain.weight.dto.WeightRecordsResponseDto;
 import ksu.finalproject.domain.weight.dto.WeightSummaryResponseDto;
@@ -39,18 +38,6 @@ public class WeightController {
             Authentication authentication) throws CustomException {
         weightService.saveRecord(request, extractUserId(authentication));
         return new CommonResponse<>(ResponseCode.SUCCESS_SAVE_WEIGHT_RECORD);
-    }
-
-    /**
-     * 목표 체중 설정
-     * POST /weight/goal
-     */
-    @PostMapping("/goal")
-    public CommonResponse<Void> saveGoal(
-            @RequestBody @Valid WeightGoalSaveRequestDto request,
-            Authentication authentication) throws CustomException {
-        weightService.saveGoal(request, extractUserId(authentication));
-        return new CommonResponse<>(ResponseCode.SUCCESS_SAVE_WEIGHT_GOAL);
     }
 
     /**

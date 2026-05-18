@@ -57,11 +57,21 @@ public enum ResponseCode {
 
     //region [  5000번대: weight 관련  ]
     SUCCESS_SAVE_WEIGHT_RECORD(5000, true, "체중이 기록되었어요."),
-    SUCCESS_SAVE_WEIGHT_GOAL(5001, true, "목표 체중이 설정되었어요."),
-    SUCCESS_GET_WEIGHT_SUMMARY(5002, true, "체중 정보 조회에 성공했어요."),
-    NOT_FOUND_WEIGHT_RECORD(5003, false, "체중 기록을 찾을 수 없어요."),
-    SUCCESS_GET_WEIGHT_RECORDS(5004, true, "체중 이력 조회에 성공했어요."),
-    ALREADY_EXIST_WEIGHT_RECORD(5005, false, "해당 날짜에 이미 체중 기록이 있어요."),
+    SUCCESS_GET_WEIGHT_SUMMARY(5001, true, "체중 정보 조회에 성공했어요."),
+    NOT_FOUND_WEIGHT_RECORD(5002, false, "체중 기록을 찾을 수 없어요."),
+    SUCCESS_GET_WEIGHT_RECORDS(5003, true, "체중 이력 조회에 성공했어요."),
+    //endregion
+
+    //region [  6000번대: goal 관련  ]
+    SUCCESS_SAVE_WEIGHT_GOAL(6000, true, "목표 체중이 설정되었어요."),
+    SUCCESS_SAVE_CALORIE_GOAL(6001, true, "목표 칼로리가 설정되었어요."),
+    SUCCESS_GET_GOAL_SUMMARY(6002, true, "목표 조회에 성공했어요."),
+    NOT_FOUND_WEIGHT_GOAL(6003, false, "목표 체중 기록을 찾을 수 없어요."),
+    NOT_FOUND_CALORIE_GOAL(6004, false, "목표 칼로리 기록을 찾을 수 없어요."),
+    //endregion
+
+    //region [  7000번대: dietlog 통계 관련  ]
+    SUCCESS_GET_DIET_STATS(7000, true, "식단 통계 조회에 성공했어요."),
     //endregion
 
 

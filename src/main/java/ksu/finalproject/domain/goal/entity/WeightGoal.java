@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.weight.entity;
+package ksu.finalproject.domain.goal.entity;
 
 
 import jakarta.persistence.*;
@@ -18,19 +18,19 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-@Table(name = "weight_goal")
+@Table(name = "weights_goal")
 public class WeightGoal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "goal_id")
+    @Column(name = "weight_goal_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private Users user;
 
-    @Column(name = "target_weight", nullable = false)
-    private Double targetWeight;
+    @Column(name = "goal_weights", nullable = false)
+    private Double goalWeights;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

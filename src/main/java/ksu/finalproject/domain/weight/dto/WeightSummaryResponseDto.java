@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.user.dto;
+package ksu.finalproject.domain.weight.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;

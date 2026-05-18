@@ -1,7 +1,7 @@
-package ksu.finalproject.domain.user.repository;
+package ksu.finalproject.domain.weight.repository;
 
 import ksu.finalproject.domain.user.entity.Users;
-import ksu.finalproject.domain.user.entity.WeightGoal;
+import ksu.finalproject.domain.weight.entity.WeightGoal;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

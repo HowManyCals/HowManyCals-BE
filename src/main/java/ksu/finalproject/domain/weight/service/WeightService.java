@@ -1,15 +1,15 @@
-package ksu.finalproject.domain.user.service;
+package ksu.finalproject.domain.weight.service;
 
-import ksu.finalproject.domain.user.dto.WeightGoalSaveRequestDto;
-import ksu.finalproject.domain.user.dto.WeightRecordSaveRequestDto;
-import ksu.finalproject.domain.user.dto.WeightRecordsResponseDto;
-import ksu.finalproject.domain.user.dto.WeightSummaryResponseDto;
+import ksu.finalproject.domain.weight.dto.WeightGoalSaveRequestDto;
+import ksu.finalproject.domain.weight.dto.WeightRecordSaveRequestDto;
+import ksu.finalproject.domain.weight.dto.WeightRecordsResponseDto;
+import ksu.finalproject.domain.weight.dto.WeightSummaryResponseDto;
 import ksu.finalproject.domain.user.entity.Users;
-import ksu.finalproject.domain.user.entity.WeightGoal;
-import ksu.finalproject.domain.user.entity.WeightRecord;
+import ksu.finalproject.domain.weight.entity.WeightGoal;
+import ksu.finalproject.domain.weight.entity.WeightRecord;
 import ksu.finalproject.domain.user.repository.UserRepository;
-import ksu.finalproject.domain.user.repository.WeightGoalRepository;
-import ksu.finalproject.domain.user.repository.WeightRecordRepository;
+import ksu.finalproject.domain.weight.repository.WeightGoalRepository;
+import ksu.finalproject.domain.weight.repository.WeightRecordRepository;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import lombok.RequiredArgsConstructor;
@@ -32,16 +32,11 @@ public class WeightService {
 
     /**
      * 오늘 체중 기록 저장
-     * 같은 날짜에 이미 기록이 있으면 예외 발생
+     * 같은 날짜에 여러 번 기록 가능 — 새 행 INSERT로 이력 보존
      */
     @Transactional
     public void saveRecord(WeightRecordSaveRequestDto request, Long userId) throws CustomException {
         Users user = findUser(userId);
-
-        if (weightRecordRepository.findByUserAndRecordedDate(user, request.getRecordedDate()).isPresent()) {
-            log.warn("체중 기록 중복 userId={}, date={}", userId, request.getRecordedDate());
-            throw new CustomException(ResponseCode.ALREADY_EXIST_WEIGHT_RECORD);
-        }
 
         WeightRecord record = WeightRecord.builder()
                 .user(user)

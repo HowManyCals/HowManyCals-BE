@@ -1,7 +1,8 @@
-package ksu.finalproject.domain.user.entity;
+package ksu.finalproject.domain.weight.entity;
 
 
 import jakarta.persistence.*;
+import ksu.finalproject.domain.user.entity.Users;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

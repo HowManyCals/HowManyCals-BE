@@ -1,13 +1,13 @@
-package ksu.finalproject.domain.user.controller;
+package ksu.finalproject.domain.weight.controller;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import ksu.finalproject.domain.user.dto.WeightGoalSaveRequestDto;
-import ksu.finalproject.domain.user.dto.WeightRecordSaveRequestDto;
-import ksu.finalproject.domain.user.dto.WeightRecordsResponseDto;
-import ksu.finalproject.domain.user.dto.WeightSummaryResponseDto;
-import ksu.finalproject.domain.user.service.WeightService;
+import ksu.finalproject.domain.weight.dto.WeightGoalSaveRequestDto;
+import ksu.finalproject.domain.weight.dto.WeightRecordSaveRequestDto;
+import ksu.finalproject.domain.weight.dto.WeightRecordsResponseDto;
+import ksu.finalproject.domain.weight.dto.WeightSummaryResponseDto;
+import ksu.finalproject.domain.weight.service.WeightService;
 import ksu.finalproject.global.common.CommonResponse;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;

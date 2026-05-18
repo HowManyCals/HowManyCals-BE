@@ -1,14 +1,13 @@
 package ksu.finalproject.domain.weight.service;
 
-import ksu.finalproject.domain.weight.dto.WeightGoalSaveRequestDto;
 import ksu.finalproject.domain.weight.dto.WeightRecordSaveRequestDto;
 import ksu.finalproject.domain.weight.dto.WeightRecordsResponseDto;
 import ksu.finalproject.domain.weight.dto.WeightSummaryResponseDto;
 import ksu.finalproject.domain.user.entity.Users;
-import ksu.finalproject.domain.weight.entity.WeightGoal;
+import ksu.finalproject.domain.goal.entity.WeightGoal;
 import ksu.finalproject.domain.weight.entity.WeightRecord;
 import ksu.finalproject.domain.user.repository.UserRepository;
-import ksu.finalproject.domain.weight.repository.WeightGoalRepository;
+import ksu.finalproject.domain.goal.repository.WeightGoalRepository;
 import ksu.finalproject.domain.weight.repository.WeightRecordRepository;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
@@ -48,22 +47,6 @@ public class WeightService {
         log.info("체중 기록 완료 userId={}, weight={}, date={}", userId, request.getWeight(), request.getRecordedDate());
     }
 
-    /**
-     * 목표 체중 설정
-     * 기존 목표와 무관하게 새 행 INSERT → 이력 보존
-     */
-    @Transactional
-    public void saveGoal(WeightGoalSaveRequestDto request, Long userId) throws CustomException {
-        Users user = findUser(userId);
-
-        WeightGoal goal = WeightGoal.builder()
-                .user(user)
-                .targetWeight(request.getTargetWeight())
-                .build();
-
-        weightGoalRepository.save(goal);
-        log.info("목표 체중 설정 완료 userId={}, targetWeight={}", userId, request.getTargetWeight());
-    }
 
     /**
      * 체중 메인 화면 - 현재 체중 + 목표 체중
@@ -77,16 +60,16 @@ public class WeightService {
                 .map(WeightRecord::getWeight)
                 .orElse(null);
 
-        Double targetWeight = weightGoalRepository
+        Double goalWeight = weightGoalRepository
                 .findTopByUserOrderByCreatedAtDesc(user)
-                .map(WeightGoal::getTargetWeight)
+                .map(WeightGoal::getGoalWeights)
                 .orElse(null);
 
-        log.info("체중 요약 조회 userId={}, currentWeight={}, targetWeight={}", userId, currentWeight, targetWeight);
+        log.info("체중 요약 조회 userId={}, currentWeight={}, goalWeight={}", userId, currentWeight, goalWeight);
 
         return WeightSummaryResponseDto.builder()
                 .currentWeight(currentWeight)
-                .targetWeight(targetWeight)
+                .targetWeight(goalWeight)
                 .build();
     }
 

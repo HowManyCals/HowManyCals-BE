@@ -1,10 +1,14 @@
 package ksu.finalproject.domain.food.service;
 
-import ksu.finalproject.domain.food.dto.FoodAnalyzeResponseDto;
-import ksu.finalproject.domain.food.dto.FoodAnalysisResultDto;
-import ksu.finalproject.domain.food.entity.AiAnalysisLog;
+import ksu.finalproject.domain.analysis.service.AiServerRequestService;
+import ksu.finalproject.domain.analysis.service.AnalysisSseService;
+import ksu.finalproject.domain.analysis.service.FoodAnalysisResultProcessorService;
+import ksu.finalproject.domain.analysis.service.FoodImageFileService;
+import ksu.finalproject.domain.analysis.dto.FoodAnalyzeResponseDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
+import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
 import ksu.finalproject.domain.food.entity.enums.AnalysisStatus;
-import ksu.finalproject.domain.food.repository.AiAnalysisLogRepository;
+import ksu.finalproject.domain.analysis.repository.AiAnalysisLogRepository;
 import ksu.finalproject.domain.user.entity.Users;
 import ksu.finalproject.domain.user.repository.UserRepository;
 import ksu.finalproject.global.common.CustomException;

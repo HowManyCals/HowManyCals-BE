@@ -1,7 +1,7 @@
 package ksu.finalproject.domain.food.controller;
 
-import ksu.finalproject.domain.food.dto.FoodAnalyzeResponseDto;
-import ksu.finalproject.domain.food.dto.FoodAnalysisResultDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalyzeResponseDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.food.service.FoodService;
 import ksu.finalproject.global.common.CommonResponse;
 import ksu.finalproject.global.common.CustomException;

@@ -1,12 +1,10 @@
 package ksu.finalproject.domain.dietlog.repository;
 
-import ksu.finalproject.domain.food.entity.FoodRecord;
+import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import ksu.finalproject.domain.user.entity.Users;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import java.util.Optional;
 
 public interface DietLogRepository extends JpaRepository<FoodRecord, Long> {
     // 기록 일수 = 기록한 날짜 수

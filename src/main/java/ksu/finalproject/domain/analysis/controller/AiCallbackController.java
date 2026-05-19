@@ -1,6 +1,6 @@
-package ksu.finalproject.domain.food.controller;
+package ksu.finalproject.domain.analysis.controller;
 
-import ksu.finalproject.domain.food.dto.FoodAnalysisResultDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.food.service.FoodService;
 import ksu.finalproject.global.common.CustomException;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.food.service;
+package ksu.finalproject.domain.analysis.service;
 
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;

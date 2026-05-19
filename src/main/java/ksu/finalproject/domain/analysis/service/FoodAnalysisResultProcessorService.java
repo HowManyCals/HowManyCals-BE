@@ -1,7 +1,7 @@
-package ksu.finalproject.domain.food.service;
+package ksu.finalproject.domain.analysis.service;
 
-import ksu.finalproject.domain.food.dto.FoodAnalyzeCandidateDto;
-import ksu.finalproject.domain.food.dto.FoodAnalysisResultDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalyzeCandidateDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.food.entity.Food;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import lombok.RequiredArgsConstructor;

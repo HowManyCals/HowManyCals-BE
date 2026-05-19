@@ -1,7 +1,6 @@
-package ksu.finalproject.domain.food.dto;
+package ksu.finalproject.domain.analysis.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

@@ -1,6 +1,8 @@
-package ksu.finalproject.domain.food.entity;
+package ksu.finalproject.domain.foodrecord.entity;
 
 import jakarta.persistence.*;
+import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
+import ksu.finalproject.domain.food.entity.Food;
 import ksu.finalproject.domain.food.entity.enums.MealType;
 import ksu.finalproject.domain.user.entity.Users;
 import lombok.*;

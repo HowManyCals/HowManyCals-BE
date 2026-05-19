@@ -1,6 +1,6 @@
-package ksu.finalproject.domain.food.service;
+package ksu.finalproject.domain.analysis.service;
 
-import ksu.finalproject.domain.food.dto.FoodAnalyzeResponseDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalyzeResponseDto;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
 import ksu.finalproject.global.config.AiServerProperties;

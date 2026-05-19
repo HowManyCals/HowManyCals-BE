@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.food.dto;
+package ksu.finalproject.domain.foodrecord.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;

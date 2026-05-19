@@ -1,6 +1,6 @@
-package ksu.finalproject.domain.food.repository;
+package ksu.finalproject.domain.analysis.repository;
 
-import ksu.finalproject.domain.food.entity.AiAnalysisLog;
+import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

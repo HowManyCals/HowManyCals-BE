@@ -1,6 +1,6 @@
-package ksu.finalproject.domain.food.repository;
+package ksu.finalproject.domain.foodrecord.repository;
 
-import ksu.finalproject.domain.food.entity.FoodRecord;
+import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import ksu.finalproject.domain.user.entity.Users;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

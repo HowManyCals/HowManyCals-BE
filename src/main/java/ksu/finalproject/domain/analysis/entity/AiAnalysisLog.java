@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.food.entity;
+package ksu.finalproject.domain.analysis.entity;
 
 import jakarta.persistence.*;
 import ksu.finalproject.domain.food.entity.enums.AnalysisStatus;

@@ -1,10 +1,13 @@
-package ksu.finalproject.domain.food.controller;
+package ksu.finalproject.domain.foodrecord.controller;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import ksu.finalproject.domain.food.dto.*;
-import ksu.finalproject.domain.food.service.FoodRecordService;
+import ksu.finalproject.domain.foodrecord.dto.MonthlyCalendarResponseDto;
+import ksu.finalproject.domain.foodrecord.service.FoodRecordService;
+import ksu.finalproject.domain.foodrecord.dto.DailyFoodRecordResponseDto;
+import ksu.finalproject.domain.foodrecord.dto.FoodRecordResponseDto;
+import ksu.finalproject.domain.foodrecord.dto.FoodRecordSaveRequestDto;
 import ksu.finalproject.global.common.CommonResponse;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;

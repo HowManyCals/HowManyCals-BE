@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.food.service;
+package ksu.finalproject.domain.analysis.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

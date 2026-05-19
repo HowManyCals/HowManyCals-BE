@@ -1,12 +1,15 @@
-package ksu.finalproject.domain.food.service;
+package ksu.finalproject.domain.foodrecord.service;
 
-import ksu.finalproject.domain.food.dto.*;
-import ksu.finalproject.domain.food.entity.AiAnalysisLog;
+import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
 import ksu.finalproject.domain.food.entity.Food;
-import ksu.finalproject.domain.food.entity.FoodRecord;
+import ksu.finalproject.domain.foodrecord.dto.DailyFoodRecordResponseDto;
+import ksu.finalproject.domain.foodrecord.dto.FoodRecordResponseDto;
+import ksu.finalproject.domain.foodrecord.dto.FoodRecordSaveRequestDto;
+import ksu.finalproject.domain.foodrecord.dto.MonthlyCalendarResponseDto;
+import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import ksu.finalproject.domain.food.entity.enums.MealType;
-import ksu.finalproject.domain.food.repository.AiAnalysisLogRepository;
-import ksu.finalproject.domain.food.repository.FoodRecordRepository;
+import ksu.finalproject.domain.analysis.repository.AiAnalysisLogRepository;
+import ksu.finalproject.domain.foodrecord.repository.FoodRecordRepository;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import ksu.finalproject.domain.user.entity.Users;
 import ksu.finalproject.domain.user.repository.UserRepository;

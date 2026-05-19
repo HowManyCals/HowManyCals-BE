@@ -117,8 +117,9 @@ public class UserService {
                 request.getGender(),
                 request.getHeight(),
                 request.getWeight(),
-                request.getActivityLevel(),
-                request.getAge()
+                request.getAge(),
+                request.getGoalType(),
+                request.getActivityLevel()
         );
         userRepository.save(user);
 
@@ -143,8 +144,9 @@ public class UserService {
                 user.getGender(),
                 user.getHeight(),
                 user.getWeight(),
-                user.getActivityLevel(),
-                user.getAge()
+                user.getAge(),
+                user.getGoalType(),
+                user.getActivityLevel()
         );
     }
 

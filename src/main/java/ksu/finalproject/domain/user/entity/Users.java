@@ -4,11 +4,11 @@ import jakarta.persistence.*;
 import ksu.finalproject.domain.user.entity.enums.ActivityLevel;
 import ksu.finalproject.domain.user.entity.enums.AuthProvider;
 import ksu.finalproject.domain.user.entity.enums.Gender;
+import ksu.finalproject.domain.user.entity.enums.GoalType;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -46,12 +46,16 @@ public class Users {
     @Column(name = "gender")
     private Gender gender;
 
+    @Column(name = "age")
+    private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "goal_type")
+    private GoalType goalType; // 목표 타입 (다이어터, 유지어터, 벌크업 등)
+
     @Enumerated(EnumType.STRING)
     @Column(name = "activity_level") // 추천 알고리즘에 쓰일 활동 수준
     private ActivityLevel activityLevel;
-
-    @Column(name = "age")
-    private Integer age;
 
     @Column(name = "refresh_token")
     private String refreshToken;
@@ -61,13 +65,14 @@ public class Users {
         this.refreshToken = token;
     }
 
-    public void updateProfile(String nickName, Gender gender, Integer height, Integer weight, ActivityLevel activityLevel, Integer age) {
+    public void updateProfile(String nickName, Gender gender, Integer height, Integer weight, Integer age, GoalType goalType, ActivityLevel activityLevel) {
         this.nickName = nickName;
         this.gender = gender;
         this.height = height;
         this.weight = weight;
-        this.activityLevel = activityLevel;
         this.age = age;
+        this.goalType = goalType;
+        this.activityLevel = activityLevel;
     }
 
     @CreatedDate // 자동으로 기재

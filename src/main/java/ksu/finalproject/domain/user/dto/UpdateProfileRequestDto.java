@@ -3,6 +3,7 @@ package ksu.finalproject.domain.user.dto;
 import jakarta.validation.constraints.*;
 import ksu.finalproject.domain.user.entity.enums.ActivityLevel;
 import ksu.finalproject.domain.user.entity.enums.Gender;
+import ksu.finalproject.domain.user.entity.enums.GoalType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -33,5 +34,8 @@ public class UpdateProfileRequestDto {
     @Min(value = 1, message = "나이는 1세 이상으로 입력해주세요.")
     @Max(value = 120, message = "나이는 120세 이하로 입력해주세요.")
     private Integer age;
+
+    @NotNull(message = "목표는 필수 항목이에요.")
+    private GoalType goalType;
 }
 

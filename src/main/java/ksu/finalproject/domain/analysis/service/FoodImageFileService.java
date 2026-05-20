@@ -34,38 +34,7 @@ public class FoodImageFileService {
 
     private final FoodImageProperties foodImageProperties;
 
-    public SavedFoodImage save(MultipartFile image) throws CustomException, IOException {
-        Path directory = Paths.get(foodImageProperties.getTempDir()).toAbsolutePath().normalize();
-        Files.createDirectories(directory);
-
-        String extension = getExtension(image.getOriginalFilename());
-        Path path = directory.resolve(UUID.randomUUID() + "." + extension);
-        image.transferTo(path.toFile());
-
-        log.info("음식 이미지 임시 저장 완료 path={}, contentType={}", path, image.getContentType());
-
-        return new SavedFoodImage(path, image.getContentType());
-    }
-
-    public void deleteFile(Path file) {
-        if (file == null) {
-            return;
-        }
-
-        try {
-            Files.deleteIfExists(file);
-            log.info("음식 이미지 임시 파일 정리 완료 path={}", file);
-        } catch (IOException e) {
-            log.warn("음식 이미지 임시 파일 정리 실패 path={}: {}", file, e.getMessage());
-        }
-    }
-
-    // validateImage open 용도
     public void validate(MultipartFile image) throws CustomException {
-        validateImage(image);
-    }
-
-    private void validateImage(MultipartFile image) throws CustomException {
         if (image == null || image.isEmpty()) {
             log.warn("음식 이미지 검증 실패 - 빈 파일 요청");
             throw new CustomException(ResponseCode.EMPTY_FOOD_IMAGE);
@@ -75,6 +44,10 @@ public class FoodImageFileService {
             throw new CustomException(ResponseCode.FOOD_IMAGE_SIZE_EXCEEDED);
         }
 
+        // 아래 검증 방법들은 완전 검증은 아님.
+        // SIGNATURE 또는 Magic Number 기반으로 파싱하는 게 필요할 수도 있음
+
+        // HTTP 헤더 값 파싱 (image/png) 후 검증
         String contentType = image.getContentType();
         if (!StringUtils.hasText(contentType)
                 || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
@@ -82,6 +55,7 @@ public class FoodImageFileService {
             throw new CustomException(ResponseCode.UNSUPPORTED_FOOD_IMAGE_TYPE);
         }
 
+        // 확장자 검증
         String extension = getExtension(image.getOriginalFilename());
         if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension)) {
             log.warn("음식 이미지 검증 실패 - 허용되지 않은 확장자 filename={}, extension={}", image.getOriginalFilename(), extension);
@@ -94,7 +68,33 @@ public class FoodImageFileService {
         return StringUtils.hasText(extension) ? extension.toLowerCase(Locale.ROOT) : "";
     }
 
-
+    // region [     file save & delete code     ]
+//    public SavedFoodImage save(MultipartFile image) throws CustomException, IOException {
+//        Path directory = Paths.get(foodImageProperties.getTempDir()).toAbsolutePath().normalize();
+//        Files.createDirectories(directory);
+//
+//        String extension = getExtension(image.getOriginalFilename());
+//        Path path = directory.resolve(UUID.randomUUID() + "." + extension);
+//        image.transferTo(path.toFile());
+//
+//        log.info("음식 이미지 임시 저장 완료 path={}, contentType={}", path, image.getContentType());
+//
+//        return new SavedFoodImage(path, image.getContentType());
+//    }
+//
+//    public void deleteFile(Path file) {
+//        if (file == null) {
+//            return;
+//        }
+//
+//        try {
+//            Files.deleteIfExists(file);
+//            log.info("음식 이미지 임시 파일 정리 완료 path={}", file);
+//        } catch (IOException e) {
+//            log.warn("음식 이미지 임시 파일 정리 실패 path={}: {}", file, e.getMessage());
+//        }
+//    }
+    //endregion
 }
 
 

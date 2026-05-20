@@ -1,5 +1,6 @@
 package ksu.finalproject.domain.analysis.service;
 
+import ch.qos.logback.core.util.StringUtil;
 import ksu.finalproject.domain.analysis.dto.FoodAnalyzeResponseDto;
 import ksu.finalproject.global.common.CustomException;
 import ksu.finalproject.global.common.ResponseCode;
@@ -7,7 +8,8 @@ import ksu.finalproject.global.config.AiServerProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,8 +21,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 /**
@@ -38,24 +43,23 @@ public class AiServerRequestService {
     /**
      * AI 서버에 이미지 분석을 비동기 요청합니다.
      *
-     * @param imageFile   분석 대상 이미지 임시 파일
-     * @param contentType 이미지 MIME 타입
-     * @param aiLogId     AI 분석 로그 ID (우리 DB PK)
+     * @param image   FE에서 전달받은 MultipartFile
+     * @param aiLogId AI 분석 로그 ID (우리 DB PK)
      * @return 접수 응답 (status: "processing", ai_log_id)
      */
-    public FoodAnalyzeResponseDto requestAnalysis(Path imageFile, String contentType, Long aiLogId) throws CustomException {
+    public FoodAnalyzeResponseDto requestAnalysis(MultipartFile image, Long aiLogId) throws CustomException {
         if (!StringUtils.hasText(aiServerProperties.getAnalyzeUrl())) {
             log.warn("AI 서버 요청 실패 - analyzeUrl 미설정 aiLogId={}", aiLogId);
             throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
         }
 
-        log.info("AI 서버 분석 요청 시작 aiLogId={}, analyzeUrl={}, contentType={}", aiLogId, aiServerProperties.getAnalyzeUrl(), contentType);
+        log.info("AI 서버 분석 요청 시작 aiLogId={}, analyzeUrl={}, contentType={}", aiLogId, aiServerProperties.getAnalyzeUrl(), image.getContentType());
 
         try {
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     aiServerProperties.getAnalyzeUrl(),
                     HttpMethod.POST,
-                    buildRequest(imageFile, contentType, aiLogId),
+                    buildRequest(image, aiLogId),
                     new ParameterizedTypeReference<>() {}
             );
 
@@ -72,26 +76,50 @@ public class AiServerRequestService {
         }
     }
 
-    private HttpEntity<MultiValueMap<String, Object>> buildRequest(Path imageFile, String contentType, Long aiLogId) {
+    /**
+     * AI 서버로 전송할 multipart/form-data 요청을 구성합니다.
+     * <p>
+     * MultipartFile의 InputStream을 {@link InputStreamResource}로 래핑하여
+     * 별도의 byte[] 복사 없이 스트림 기반으로 이미지를 전송합니다.
+     * </p>
+     *
+     * @param image   FE에서 전달받은 MultipartFile (이미지 원본)
+     * @param aiLogId AI 분석 로그 ID — AI 서버가 콜백 시 식별자로 사용
+     * @return AI 서버로 전송할 {@link HttpEntity} (multipart/form-data 형식)
+     * @throws CustomException 이미지 스트림 접근 실패 시
+     */
+    private HttpEntity<MultiValueMap<String, Object>> buildRequest(MultipartFile image, Long aiLogId) throws CustomException {
         HttpHeaders fileHeaders = new HttpHeaders();
-        if (StringUtils.hasText(contentType)) {
-            fileHeaders.setContentType(MediaType.parseMediaType(contentType));
+        if (StringUtils.hasText(image.getContentType())) {
+            fileHeaders.setContentType(MediaType.parseMediaType(image.getContentType()));
         }
 
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("ai_log_id", String.valueOf(aiLogId));
-        body.add("image", new HttpEntity<>(new FileSystemResource(imageFile.toFile()), fileHeaders));
-        if (StringUtils.hasText(aiServerProperties.getCallbackUrl())) {
-            body.add("callback_url", aiServerProperties.getCallbackUrl());
-        }
+        try {
+            InputStreamResource resource = new InputStreamResource(image.getInputStream());
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        if (StringUtils.hasText(aiServerProperties.getApiKey())) {
-            headers.add("X-API-Key", aiServerProperties.getApiKey());
-        }
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>(); // 하나의 Key에 여러 value 저장 가능
+            // 분석 요청 DTO 형식
+            // Header : X-API-KEY
+            // Body
+            // - ai_log_id
+            // - image(multipartFile)
+            // - callback_url
+            body.add("ai_log_id", String.valueOf(aiLogId));
+            body.add("image", resource);
+            if (StringUtils.hasText(aiServerProperties.getCallbackUrl())) {
+                body.add("callback_url", aiServerProperties.getCallbackUrl());
+            }
 
-        return new HttpEntity<>(body, headers);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            if(StringUtils.hasText(aiServerProperties.getApiKey()))
+                headers.add("X-API-Key", aiServerProperties.getApiKey());
+
+            return new HttpEntity<>(body, headers);
+        } catch (IOException e) {
+            log.error("이미지 바이트 변환 실패 aiLogId={}", aiLogId, e);
+            throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
+        }
     }
 
     private FoodAnalyzeResponseDto toResponseDto(Map<String, Object> body, Long aiLogId) {

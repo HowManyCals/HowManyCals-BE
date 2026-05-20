@@ -1,5 +1,6 @@
 package ksu.finalproject.domain.food.service;
 
+import ksu.finalproject.domain.analysis.cache.AnalysisImageStore;
 import ksu.finalproject.domain.analysis.service.AiServerRequestService;
 import ksu.finalproject.domain.analysis.service.AnalysisSseService;
 import ksu.finalproject.domain.analysis.service.FoodAnalysisResultProcessorService;
@@ -31,6 +32,7 @@ public class FoodService {
 
     private final AiServerRequestService aiServerRequestService;
     private final FoodImageFileService foodImageFileService;
+    private final AnalysisImageStore analysisImageStore;
     private final AiAnalysisLogRepository aiAnalysisLogRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
@@ -50,16 +52,12 @@ public class FoodService {
         foodImageFileService.validate(image);
 
         AiAnalysisLog log = createAnalysisLog(userId);
-        FoodImageFileService.SavedFoodImage savedImage = null;
-
         try {
-            savedImage = foodImageFileService.save(image);
             FoodAnalyzeResponseDto response = aiServerRequestService.requestAnalysis(
-                    savedImage.path(),
-                    savedImage.contentType(),
+                    image,
                     log.getId()
             );
-            log.success(toJson(response));
+            log.success(toJson(response)); // success 마킹 처리
             aiAnalysisLogRepository.save(log);
             FoodService.log.info("음식 이미지 분석 요청 접수 완료 userId={}, aiLogId={}, status={}", userId, log.getId(), response.getStatus());
             return response;
@@ -67,12 +65,6 @@ public class FoodService {
             markFailed(log);
             FoodService.log.warn("음식 이미지 분석 요청 실패 userId={}, aiLogId={}, responseCode={}", userId, log.getId(), e.getStatus(), e);
             throw e;
-        } catch (IOException e) {
-            markFailed(log);
-            FoodService.log.error("음식 이미지 임시 파일 처리 실패 userId={}, aiLogId={}", userId, log.getId(), e);
-            throw new CustomException(ResponseCode.FOOD_IMAGE_UPLOAD_FAILED);
-        } finally {
-            foodImageFileService.deleteFile(savedImage != null ? savedImage.path() : null);
         }
     }
 
@@ -184,7 +176,7 @@ public class FoodService {
     }
 
     private void markFailed(AiAnalysisLog log) {
-        log.fail();
+        log.fail(); // failed 마킹 처리
         aiAnalysisLogRepository.save(log);
         FoodService.log.warn("분석 로그 상태 실패 처리 aiLogId={}", log.getId());
     }

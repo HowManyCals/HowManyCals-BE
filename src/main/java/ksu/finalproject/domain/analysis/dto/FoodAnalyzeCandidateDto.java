@@ -1,6 +1,8 @@
 package ksu.finalproject.domain.analysis.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.persistence.Column;
+import ksu.finalproject.domain.analysis.entity.DataSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,7 +22,22 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("food_name")
     private String foodName;
 
+    @JsonProperty("serving_kcal")
+    private Double servingKcal;
+
+    @JsonProperty("carbohydrate")
+    private Double carbohydrate;
+
+    @JsonProperty("protein")
+    private Double protein;
+
+    @JsonProperty("fat")
+    private Double fat;
+
     @JsonProperty("serving_unit_label") // 900g, 200ml 이런 식으로 내려줌
     private String servingUnitLabel;
+
+    @JsonProperty("data_source")
+    private DataSource dataSource;
 }
 

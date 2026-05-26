@@ -41,7 +41,7 @@ out/
 관련 자료
 docs
 /src/test
-AGENTS.md
+aAGENTS.md
 
 ### 민감한 데이터 ###
 application.properties

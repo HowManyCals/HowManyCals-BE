@@ -55,8 +55,7 @@ public class AiAnalysisLog {
 
     // AI 서버 접수 성공 -> rawOutput 저장, 상태를 PROCESSING으로 전환
     public void success(String rawOutput) {
-        this.rawOutput = rawOutput;
-        this.analysisStatus = AnalysisStatus.PROCESSING;
+
     }
 
     // AI 서버 요청 실패 -> 상태를 FAILED로 전환
@@ -72,6 +71,9 @@ public class AiAnalysisLog {
         this.rawOutput = rawOutput;
         this.inferenceTimeMs = inferenceTimeMs;
         this.analysisStatus = analysisStatus;
+    }
+
+    public void success() {
     }
 }
 

@@ -7,6 +7,7 @@ import ksu.finalproject.global.config.AiServerProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -55,7 +56,8 @@ public class AiServerRequestService {
                     aiServerProperties.getAnalyzeUrl(),
                     HttpMethod.POST,
                     buildRequest(image, aiLogId),
-                    new ParameterizedTypeReference<>() {}
+                    new ParameterizedTypeReference<>() {
+                    }
             );
 
             if (!response.getStatusCode().is2xxSuccessful()) {
@@ -74,45 +76,52 @@ public class AiServerRequestService {
     /**
      * AI 서버로 전송할 multipart/form-data 요청을 구성합니다.
      * <p>
-     * MultipartFile의 InputStream을 {@link InputStreamResource}로 래핑하여
-     * 별도의 byte[] 복사 없이 스트림 기반으로 이미지를 전송합니다.
+     * MultipartFile의 바이트 배열을 {@link ByteArrayResource}로 래핑하여
+     * Content-Disposition에 filename을 포함시켜 AI 서버가 파일로 인식하도록 합니다.
      * </p>
      *
      * @param image   FE에서 전달받은 MultipartFile (이미지 원본)
      * @param aiLogId AI 분석 로그 ID — AI 서버가 콜백 시 식별자로 사용
      * @return AI 서버로 전송할 {@link HttpEntity} (multipart/form-data 형식)
-     * @throws CustomException 이미지 스트림 접근 실패 시
+     * @throws CustomException 이미지 바이트 배열 변환 실패 시
      */
     private HttpEntity<MultiValueMap<String, Object>> buildRequest(MultipartFile image, Long aiLogId) throws CustomException {
+        try{
+        // multipart 표준 스펙에 따라, 파일 값에 파일명(filename)을 지정해줘야 실제 파일로 인식함.
+        ByteArrayResource imageResource = new ByteArrayResource(image.getBytes()) {
+            @Override // Content-Disposition에 filename 포함하기 위한 재정의
+            public String getFilename() {
+                return StringUtils.hasText(image.getOriginalFilename())
+                        ? image.getOriginalFilename()
+                        : "image.jpg"; // fallback
+            }
+        };
         HttpHeaders fileHeaders = new HttpHeaders();
         if (StringUtils.hasText(image.getContentType())) {
             fileHeaders.setContentType(MediaType.parseMediaType(image.getContentType()));
         }
 
-        try {
-            InputStreamResource resource = new InputStreamResource(image.getInputStream());
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>(); // 하나의 Key에 여러 value 저장 가능
+        // 분석 요청 DTO 형식
+        // Header : X-API-KEY
+        // Body
+        // - ai_log_id
+        // - image(multipartFile)
+        // - callback_url
+        body.add("ai_log_id", String.valueOf(aiLogId));
+        body.add("image", new HttpEntity<>(imageResource, fileHeaders));
+        if (StringUtils.hasText(aiServerProperties.getCallbackUrl())) {
+            body.add("callback_url", aiServerProperties.getCallbackUrl());
+        }
 
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>(); // 하나의 Key에 여러 value 저장 가능
-            // 분석 요청 DTO 형식
-            // Header : X-API-KEY
-            // Body
-            // - ai_log_id
-            // - image(multipartFile)
-            // - callback_url
-            body.add("ai_log_id", String.valueOf(aiLogId));
-            body.add("image", resource);
-            if (StringUtils.hasText(aiServerProperties.getCallbackUrl())) {
-                body.add("callback_url", aiServerProperties.getCallbackUrl());
-            }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        if (StringUtils.hasText(aiServerProperties.getApiKey()))
+            headers.add("X-API-Key", aiServerProperties.getApiKey());
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-            if(StringUtils.hasText(aiServerProperties.getApiKey()))
-                headers.add("X-API-Key", aiServerProperties.getApiKey());
-
-            return new HttpEntity<>(body, headers);
+        return new HttpEntity<>(body, headers);
         } catch (IOException e) {
-            log.error("이미지 바이트 변환 실패 aiLogId={}", aiLogId, e);
+            log.error("이미지 바이트 배열 변환 실패 aiLogId={}", aiLogId, e);
             throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
         }
     }
@@ -126,4 +135,3 @@ public class AiServerRequestService {
                 .build();
     }
 }
-

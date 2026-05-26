@@ -1,6 +1,7 @@
 package ksu.finalproject.domain.food.service;
 
 import ksu.finalproject.domain.analysis.cache.AnalysisImageStore;
+import ksu.finalproject.domain.analysis.dto.AiAnalysisCallbackDto;
 import ksu.finalproject.domain.analysis.service.AiServerRequestService;
 import ksu.finalproject.domain.analysis.service.AnalysisSseService;
 import ksu.finalproject.domain.analysis.service.FoodAnalysisResultProcessorService;
@@ -32,12 +33,12 @@ public class FoodService {
 
     private final AiServerRequestService aiServerRequestService;
     private final FoodImageFileService foodImageFileService;
-    private final AnalysisImageStore analysisImageStore;
     private final AiAnalysisLogRepository aiAnalysisLogRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final AnalysisSseService analysisSseService;
     private final FoodAnalysisResultProcessorService resultProcessorService;
+    private final AnalysisImageStore analysisImageStore;
 
     /**
      * 음식 이미지를 AI 서버에 비동기 분석 요청합니다.
@@ -49,22 +50,25 @@ public class FoodService {
                 image != null ? image.getOriginalFilename() : null,
                 image != null ? image.getSize() : null);
 
-        foodImageFileService.validate(image);
+        foodImageFileService.validate(image); // 이미지 검증 (확장자, HTTP 헤더 값 기반)
 
         AiAnalysisLog log = createAnalysisLog(userId);
         try {
+            analysisImageStore.save(log.getId(), image); // 이미지 캐싱
             FoodAnalyzeResponseDto response = aiServerRequestService.requestAnalysis(
                     image,
                     log.getId()
             );
-            log.success(toJson(response)); // success 마킹 처리
-            aiAnalysisLogRepository.save(log);
-            FoodService.log.info("음식 이미지 분석 요청 접수 완료 userId={}, aiLogId={}, status={}", userId, log.getId(), response.getStatus());
+            markSuccessed(log);
             return response;
         } catch (CustomException e) {
             markFailed(log);
             FoodService.log.warn("음식 이미지 분석 요청 실패 userId={}, aiLogId={}, responseCode={}", userId, log.getId(), e.getStatus(), e);
             throw e;
+        } catch (IOException e){
+            markFailed(log);
+            FoodService.log.error("이미지 바이트 읽기 실패 userId={}, aiLogId={}", userId, log.getId(), e);
+            throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
         }
     }
 
@@ -85,7 +89,7 @@ public class FoodService {
     /**
      * AI 서버 콜백으로 수신된 분석 결과를 로그에 저장하고, 구독 중인 FE에 즉시 푸시합니다.
      */
-    public void saveAnalysisResult(FoodAnalysisResultDto result) throws CustomException {
+    public void saveAnalysisResult(AiAnalysisCallbackDto result) throws CustomException {
         if (result == null || result.getAiLogId() == null) {
             log.warn("AI 콜백 수신 실패 - result 또는 aiLogId 누락");
             throw new CustomException(ResponseCode.BAD_REQUEST);
@@ -106,11 +110,13 @@ public class FoodService {
                     return new CustomException(ResponseCode.NOT_FOUND_FOOD_IMAGE_ANALYSIS);
                 });
 
+        FoodAnalysisResultDto processedResult = resultProcessorService.process(result);
+
         analysisLog.updateAnalysisResult(
-                result.getModelVersion(),
-                toJson(result),
-                result.getInferenceTimeMs(),
-                result.getAnalysisStatus()
+                processedResult.getModelVersion(),
+                toJson(processedResult),
+                processedResult.getInferenceTimeMs(),
+                processedResult.getAnalysisStatus()
         );
         aiAnalysisLogRepository.save(analysisLog);
 
@@ -124,7 +130,7 @@ public class FoodService {
 
         // 구독 중인 FE에 결과 푸시
         log.info("AI 콜백 SSE 전송 시도 aiLogId={}", analysisLog.getId());
-        analysisSseService.emit(analysisLog.getId(), toResultDto(analysisLog));
+        analysisSseService.emit(analysisLog.getId(), processedResult);
     }
 
     /**
@@ -175,6 +181,11 @@ public class FoodService {
         return savedLog;
     }
 
+    private void markSuccessed(AiAnalysisLog log){
+        log.success(); // success 마킹 처리
+        aiAnalysisLogRepository.save(log);
+        FoodService.log.info("음식 이미지 분석 요청 접수 완료 aiLogId={}", log.getId());
+    }
     private void markFailed(AiAnalysisLog log) {
         log.fail(); // failed 마킹 처리
         aiAnalysisLogRepository.save(log);
@@ -187,7 +198,7 @@ public class FoodService {
         // 콜백으로 최종 결과가 저장된 경우 역직렬화해서 반환
         if (StringUtils.hasText(raw) && log.getAnalysisStatus() != AnalysisStatus.PROCESSING) {
             try {
-                return resultProcessorService.process(objectMapper.readValue(raw, FoodAnalysisResultDto.class));
+                return objectMapper.readValue(raw, FoodAnalysisResultDto.class);
             } catch (Exception e) {
                 FoodService.log.error("분석 결과 역직렬화 실패 aiLogId={}, status={}", log.getId(), log.getAnalysisStatus(), e);
                 throw new CustomException(ResponseCode.AI_SERVER_RESPONSE_INVALID);

@@ -1,6 +1,5 @@
 package ksu.finalproject.domain.food.entity;
 
-import ch.qos.logback.core.util.StringUtil;
 import jakarta.persistence.*;
 import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import lombok.*;
@@ -40,6 +39,17 @@ public class Food {
     public String getDisplayName(){
         if (StringUtils.hasText(detailCategory)) return detailCategory + " " + subCategory; // 예 : 바지락 칼국수
         return subCategory; // 예 : 칼국수
+    }
+
+    public String getCanonicalName() {
+        if (StringUtils.hasText(detailCategory)) return detailCategory + subCategory; // 예 : 바지락칼국수
+        return subCategory; // 예 : 칼국수
+    }
+
+    public String getNormalizedCanonicalName() {
+        String canonicalName = getCanonicalName();
+        if (!StringUtils.hasText(canonicalName)) return null;
+        return canonicalName.replaceAll("[_\\s]+", "").toLowerCase();
     }
 
     // 기준 제공 수량 (예: 1, 2, 3, 0.5)

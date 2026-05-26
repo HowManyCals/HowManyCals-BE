@@ -3,6 +3,7 @@ package ksu.finalproject.domain.food.init;
 import ksu.finalproject.domain.food.entity.Food;
 import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import ksu.finalproject.domain.food.repository.FoodRepository;
+import ksu.finalproject.domain.food.service.FoodAliasSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -33,6 +34,7 @@ public class FoodSeedInitializer implements ApplicationRunner {
     private static final int EXPECTED_COLUMN_COUNT = 13;
 
     private final FoodRepository foodRepository;
+    private final FoodAliasSyncService foodAliasSyncService;
 
     @Override
     @Transactional
@@ -49,6 +51,7 @@ public class FoodSeedInitializer implements ApplicationRunner {
         }
 
         foodRepository.saveAll(foods);
+        foodAliasSyncService.syncIfNeeded();
         log.info("음식 시드 저장 완료. count={}", foods.size());
     }
 

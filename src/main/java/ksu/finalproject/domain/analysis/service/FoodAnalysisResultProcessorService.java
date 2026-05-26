@@ -24,6 +24,10 @@ import java.util.Objects;
 @Component
 @RequiredArgsConstructor
 public class FoodAnalysisResultProcessorService {
+    private static final int SHORT_WORD_MAX_DISTANCE = 1;
+    private static final int MEDIUM_WORD_MAX_DISTANCE = 2;
+    private static final int LONG_WORD_MAX_DISTANCE = 3;
+
     private final FoodRepository foodRepository;
 
     // AI 콜백 원본 DTO를 FE 응답 DTO로 가공
@@ -109,11 +113,15 @@ public class FoodAnalysisResultProcessorService {
         return new ArrayList<>(aliases);
     }
 
-    // alias 기반으로 가장 먼저 매칭되는 fuzzy 후보 탐색
+    // alias 기반으로 레벤슈타인 거리가 가장 가까운 fuzzy 후보 탐색
     private Food findBestFuzzyMatch(String targetName, List<Food> foods) {
         String normalizedTarget = normalize(targetName);
 
         if (!StringUtils.hasText(normalizedTarget)) return null;
+
+        Food bestMatch = null;
+        int bestDistance = Integer.MAX_VALUE;
+        String bestAlias = null;
 
         for (Food food : foods) {
             for (String alias : buildSearchAliases(food)) {
@@ -123,14 +131,20 @@ public class FoodAnalysisResultProcessorService {
                     continue;
                 }
 
-                // 단순하게 부분 문자열인지 확인
-                if (normalizedAlias.contains(normalizedTarget) || normalizedTarget.contains(normalizedAlias)) {
-                    return food;
+                int distance = calculateLevenshteinDistance(normalizedTarget, normalizedAlias);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestMatch = food;
+                    bestAlias = normalizedAlias;
                 }
             }
         }
 
-        return null;
+        if (bestMatch == null || !isAcceptableDistance(normalizedTarget, bestAlias, bestDistance)) {
+            return null;
+        }
+
+        return bestMatch;
     }
 
     // 공백/언더스코어 제거 후 비교 가능한 문자열로 정규화
@@ -142,6 +156,48 @@ public class FoodAnalysisResultProcessorService {
         // 모든 공백 제거
         // - \s (공백문자 whitespace)
         // - +는 1개 이상 반복된 것 모두
+    }
+
+    // 레벤슈타인 거리 기반 fuzzy 매칭 허용 범위 판정
+    private boolean isAcceptableDistance(String normalizedTarget, String normalizedAlias, int distance) {
+        if (!StringUtils.hasText(normalizedTarget) || !StringUtils.hasText(normalizedAlias)) {
+            return false;
+        }
+
+        int longestLength = Math.max(normalizedTarget.length(), normalizedAlias.length());
+        if (longestLength <= 4) {
+            return distance <= SHORT_WORD_MAX_DISTANCE;
+        }
+        if (longestLength <= 8) {
+            return distance <= MEDIUM_WORD_MAX_DISTANCE;
+        }
+        return distance <= LONG_WORD_MAX_DISTANCE;
+    }
+
+    // 두 문자열의 레벤슈타인 거리 계산
+    private int calculateLevenshteinDistance(String source, String target) {
+        int[][] dp = new int[source.length() + 1][target.length() + 1];
+
+        // 베이스 케이스 삽입
+        for (int i = 0; i <= source.length(); i++) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= target.length(); j++) {
+            dp[0][j] = j;
+        }
+
+        for (int i = 1; i <= source.length(); i++) {
+            for (int j = 1; j <= target.length(); j++) {
+                int substitutionCost = source.charAt(i - 1) == target.charAt(j - 1) ? 0 : 1;
+
+                dp[i][j] = Math.min(
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + substitutionCost
+                );
+            }
+        }
+
+        return dp[source.length()][target.length()];
     }
 
     // 후보 1건을 exact/fuzzy/unmatched 분기 후 FE 응답 후보 DTO로 변환

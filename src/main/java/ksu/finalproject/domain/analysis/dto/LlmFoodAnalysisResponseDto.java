@@ -6,10 +6,12 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * LLM(Gemini)이 음식명 추정 후 반환하는 응답 DTO
- * 영양정보는 신뢰도가 불명확하므로 요청하지 않음
- * 음식명과 confidence만 반환받음
+ * 가장 가능성 높은 음식 후보 3개를 반환받음
  */
 @Getter
 @Builder
@@ -17,10 +19,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LlmFoodAnalysisResponseDto {
 
-    @JsonProperty("food_name")
-    private String foodName;
-
-    @JsonProperty("confidence_score")
-    private Double confidenceScore;
+    @JsonProperty("candidates")
+    @Builder.Default
+    private List<String> candidates = Collections.emptyList();
 }
 

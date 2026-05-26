@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface FoodAliasRepository extends JpaRepository<FoodAlias, Long> {
@@ -21,6 +22,25 @@ public interface FoodAliasRepository extends JpaRepository<FoodAlias, Long> {
               and fa.normalizedAlias in :normalizedAliases
             """)
     List<FoodAlias> findAllActiveWithFoodByNormalizedAliasIn(@Param("normalizedAliases") Collection<String> normalizedAliases);
+
+    @Query("""
+            select fa
+            from FoodAlias fa
+            join fetch fa.food f
+            where fa.isActive = true
+              and f.isActive = true
+              and fa.normalizedAlias = :normalizedAlias
+            """)
+    Optional<FoodAlias> findActiveWithFoodByNormalizedAlias(@Param("normalizedAlias") String normalizedAlias);
+
+    @Query("""
+            select fa
+            from FoodAlias fa
+            join fetch fa.food f
+            where fa.isActive = true
+              and f.isActive = true
+            """)
+    List<FoodAlias> findAllActiveWithFood();
 
     @Query("""
             select fa.food.id

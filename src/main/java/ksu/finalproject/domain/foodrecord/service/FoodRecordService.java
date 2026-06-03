@@ -1,5 +1,6 @@
 package ksu.finalproject.domain.foodrecord.service;
 
+import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
 import ksu.finalproject.domain.food.entity.Food;
 import ksu.finalproject.domain.foodrecord.dto.DailyFoodRecordResponseDto;
@@ -19,11 +20,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,6 +39,7 @@ public class FoodRecordService {
     private final UserRepository userRepository;
     private final FoodRepository foodRepository;
     private final AiAnalysisLogRepository aiAnalysisLogRepository;
+    private final ObjectMapper objectMapper;
 
     /**
      * 식사 기록을 저장합니다.
@@ -43,25 +48,9 @@ public class FoodRecordService {
     public FoodRecordResponseDto saveRecord(FoodRecordSaveRequestDto request, Long userId) throws CustomException {
         Users user = findUser(userId);
 
-        // Food 조회 (nullable)
-        Food food = null;
-        if (request.getFoodId() != null) {
-            food = foodRepository.findById(request.getFoodId())
-                    .orElseThrow(() -> {
-                        log.warn("식사 기록 저장 실패 - 음식 없음 foodId={}", request.getFoodId());
-                        return new CustomException(ResponseCode.NOT_FOUND);
-                    });
-        }
+        AiAnalysisLog aiAnalysisLog = findAiAnalysisLog(request.getAiLogId());
 
-        // AiAnalysisLog 조회 (nullable)
-        AiAnalysisLog aiAnalysisLog = null;
-        if (request.getAiLogId() != null) {
-            aiAnalysisLog = aiAnalysisLogRepository.findById(request.getAiLogId())
-                    .orElseThrow(() -> {
-                        log.warn("식사 기록 저장 실패 - AI 분석 로그 없음 aiLogId={}", request.getAiLogId());
-                        return new CustomException(ResponseCode.NOT_FOUND_FOOD_IMAGE_ANALYSIS);
-                    });
-        }
+        Food food = resolveFood(request.getFoodId(), aiAnalysisLog);
 
         FoodRecord record = FoodRecord.builder()
                 .user(user)
@@ -164,7 +153,7 @@ public class FoodRecordService {
 
         record.deActivate();
 
-        log.info("식사 기록 비활성화 완료 userId={]", userId);
+        log.info("식사 기록 비활성화 완료 userId={}", userId);
     }
 
     private Users findUser(Long userId) throws CustomException {
@@ -173,6 +162,68 @@ public class FoodRecordService {
                     log.warn("사용자 없음 userId={}", userId);
                     return new CustomException(ResponseCode.NOT_FOUND_USER);
                 });
+    }
+
+    private AiAnalysisLog findAiAnalysisLog(Long aiLogId) throws CustomException {
+        if (aiLogId == null) {
+            return null;
+        }
+
+        return aiAnalysisLogRepository.findById(aiLogId)
+                .orElseThrow(() -> {
+                    log.warn("식사 기록 저장 실패 - AI 분석 로그 없음 aiLogId={}", aiLogId);
+                    return new CustomException(ResponseCode.NOT_FOUND_FOOD_IMAGE_ANALYSIS);
+                });
+    }
+
+    private Food resolveFood(Long requestFoodId, AiAnalysisLog aiAnalysisLog) throws CustomException {
+        if (requestFoodId != null) {
+            return foodRepository.findById(requestFoodId)
+                    .orElseThrow(() -> {
+                        log.warn("식사 기록 저장 실패 - 음식 없음 foodId={}", requestFoodId);
+                        return new CustomException(ResponseCode.NOT_FOUND);
+                    });
+        }
+
+        Long resolvedFoodId = extractFoodIdFromAnalysis(aiAnalysisLog);
+        if (resolvedFoodId == null) {
+            return null;
+        }
+
+        Food resolvedFood = foodRepository.findById(resolvedFoodId).orElse(null);
+        if (resolvedFood == null) {
+            log.warn("식사 기록 저장 - AI 분석 결과 foodId 자동 매핑 실패 aiLogId={}, foodId={}",
+                    aiAnalysisLog.getId(),
+                    resolvedFoodId);
+            return null;
+        }
+
+        log.info("식사 기록 저장 - AI 분석 결과 foodId 자동 매핑 aiLogId={}, foodId={}",
+                aiAnalysisLog.getId(),
+                resolvedFoodId);
+        return resolvedFood;
+    }
+
+    private Long extractFoodIdFromAnalysis(AiAnalysisLog aiAnalysisLog) {
+        if (aiAnalysisLog == null || !StringUtils.hasText(aiAnalysisLog.getRawOutput())) {
+            return null;
+        }
+
+        try {
+            FoodAnalysisResultDto analysisResult = objectMapper.readValue(aiAnalysisLog.getRawOutput(), FoodAnalysisResultDto.class);
+            if (analysisResult.getCandidates() == null || analysisResult.getCandidates().isEmpty()) {
+                return null;
+            }
+
+            return analysisResult.getCandidates().stream()
+                    .map(candidate -> candidate != null ? candidate.getFoodId() : null)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("식사 기록 저장 - 분석 결과에서 foodId 추출 실패 aiLogId={}", aiAnalysisLog.getId(), e);
+            return null;
+        }
     }
 }
 

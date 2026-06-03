@@ -13,6 +13,9 @@ public class DietLogResponseDto {
     @JsonProperty("goal_achieved_days")
     private long goalAchievedDays;
 
-    @JsonProperty("streak_days")
-    private long streakDays;
+    @JsonProperty("current_streak_days")
+    private long currentStreakDays;
+
+    @JsonProperty("max_streak_days")
+    private long maxStreakDays;
 }

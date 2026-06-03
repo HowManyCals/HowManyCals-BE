@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import ksu.finalproject.domain.weight.dto.WeightRecordSaveRequestDto;
 import ksu.finalproject.domain.weight.dto.WeightRecordsResponseDto;
 import ksu.finalproject.domain.weight.dto.WeightSummaryResponseDto;
+import ksu.finalproject.domain.weight.dto.WeightYearlyRecordsResponseDto;
 import ksu.finalproject.domain.weight.service.WeightService;
 import ksu.finalproject.global.common.CommonResponse;
 import ksu.finalproject.global.common.CustomException;
@@ -73,6 +74,18 @@ public class WeightController {
             Authentication authentication) throws CustomException {
         return new CommonResponse<>(ResponseCode.SUCCESS_GET_WEIGHT_RECORDS,
                 weightService.getMonthlyRecords(year, month, extractUserId(authentication)));
+    }
+
+    /**
+     * 연간 그래프
+     * GET /weight/records/yearly?year=2026
+     */
+    @GetMapping("/records/yearly")
+    public CommonResponse<WeightYearlyRecordsResponseDto> getYearlyRecords(
+            @RequestParam int year,
+            Authentication authentication) throws CustomException {
+        return new CommonResponse<>(ResponseCode.SUCCESS_GET_WEIGHT_RECORDS,
+                weightService.getYearlyRecords(year, extractUserId(authentication)));
     }
 }
 

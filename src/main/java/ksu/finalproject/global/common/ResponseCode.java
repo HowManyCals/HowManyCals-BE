@@ -53,6 +53,7 @@ public enum ResponseCode {
     SUCCESS_GET_MONTHLY_CALENDAR(4002, true, "월별 캘린더 조회에 성공했어요."),
     NOT_FOUND_FOOD_RECORD(4003, false, "해당 식사 기록을 찾을 수 없어요."),
     SUCCESS_DELETE_FOOD_RECORD(4004, true, "식사 기록이 삭제되었어요."),
+    SUCCESS_SEARCH_FOOD_FOR_MANUAL_ENTRY(4005, true, "수동 입력용 음식 검색에 성공했어요."),
     //endregion
 
     //region [  5000번대: weight 관련  ]
@@ -72,6 +73,12 @@ public enum ResponseCode {
 
     //region [  7000번대: dietlog 통계 관련  ]
     SUCCESS_GET_DIET_STATS(7000, true, "식단 통계 조회에 성공했어요."),
+    //endregion
+
+    //region [  8000번대: recommendation 관련  ]
+    SUCCESS_GET_DAILY_MEAL_RECOMMENDATION(8000, true, "일일 식단 추천 조회에 성공했어요."),
+    SUCCESS_GENERATE_DAILY_MEAL_RECOMMENDATION(8001, true, "일일 식단 추천 생성에 성공했어요."),
+    NOT_FOUND_DAILY_MEAL_RECOMMENDATION(8002, false, "해당 날짜의 식단 추천을 찾을 수 없어요."),
     //endregion
 
 

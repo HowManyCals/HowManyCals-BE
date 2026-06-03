@@ -14,6 +14,8 @@ public interface FoodRecordRepository extends JpaRepository<FoodRecord, Long> {
     // 월별 캘린더: 해당 기간의 모든 기록 조회 (날짜별 칼로리 집계용)
     List<FoodRecord> findByUserAndEatenDateBetween(Users user, LocalDate start, LocalDate end);
 
+    List<FoodRecord> findByUserAndEatenDateGreaterThanEqualAndEatenDateLessThan(Users user, LocalDate startInclusive, LocalDate endExclusive);
+
     // 일별 상세: 특정 날짜의 모든 식사 기록 (식사 순서대로 정렬)
     List<FoodRecord> findByUserAndEatenDateOrderByMealTypeAsc(Users user, LocalDate date);
 }

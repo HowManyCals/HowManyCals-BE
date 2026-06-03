@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Optional;
+import java.util.List;
 
 public interface DietLogRepository extends JpaRepository<FoodRecord, Long> {
     // 기록 일수 = 기록한 날짜 수
@@ -15,6 +15,8 @@ public interface DietLogRepository extends JpaRepository<FoodRecord, Long> {
         // WHERE user.id = ?
     @Query("SELECT COUNT(DISTINCT(fr.eatenDate)) FROM FoodRecord fr WHERE fr.user = :user")
     long countDistinctEatenDateByUser(@Param("user")Users user);
+
+    List<FoodRecord> findByUserOrderByEatenDateAscCreatedAtAsc(Users user);
 
     // 목표 달성 일수 (성공 count)
     /*

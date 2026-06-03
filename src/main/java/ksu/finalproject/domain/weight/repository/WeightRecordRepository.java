@@ -20,4 +20,6 @@ public interface WeightRecordRepository extends JpaRepository<WeightRecord, Long
 
     Optional<WeightRecord> findTopByUserOrderByRecordedDateDesc(Users user);
     // SELECT TOP 1 FROM weight_record WHERE user_id = ? ORDER BY recorded_date DESC;
+
+    Optional<WeightRecord> findTopByUserAndRecordedDateLessThanOrderByRecordedDateDescCreatedAtDesc(Users user, LocalDate date);
 }

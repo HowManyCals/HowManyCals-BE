@@ -1,35 +1,58 @@
 package ksu.finalproject.domain.food.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "unmatched_food_log")
 public class UnmatchedFoodLog {
-//    id
-//    llmFoodName        ← "어떤 음식이" 없는지
-//    isResolved         ← 관리자 처리 여부
-//    createdAt          ← "언제" 발생했는지
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "unmatched_id")
+    @Column(name = "unmatched_food_log_id")
     private Long id;
 
-    @Column(name = "llm_food_name", nullable = false)
-    private String llmFoodName;
+    @Column(name = "ai_log_id", nullable = false)
+    private Long aiLogId;
 
-    @Column(name = "is_resolved", nullable = false)
-    @Builder.Default
-    private Boolean isResolved = false;
+    @Column(name = "original_food_name")
+    private String originalFoodName;
+
+    @Column(name = "confidence_score")
+    private Double confidenceScore;
+
+    @Column(name = "llm_main_category")
+    private String llmMainCategory;
+
+    @Column(name = "llm_base_food")
+    private String llmBaseFood;
+
+    @Column(name = "llm_modifiers", length = 1000)
+    private String llmModifiers;
+
+    @Column(name = "failure_reason", length = 1000)
+    private String failureReason;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDate createdAt;
-
+    private LocalDateTime createdAt;
 }
+

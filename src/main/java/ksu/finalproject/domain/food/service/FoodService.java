@@ -54,7 +54,7 @@ public class FoodService {
 
         AiAnalysisLog log = createAnalysisLog(userId);
         try {
-            analysisImageStore.save(log.getId(), image); // 이미지 캐싱
+            analysisImageStore.save(log.getId(), image);
             FoodAnalyzeResponseDto response = aiServerRequestService.requestAnalysis(
                     image,
                     log.getId()
@@ -62,10 +62,12 @@ public class FoodService {
             markSuccessed(log);
             return response;
         } catch (CustomException e) {
+            analysisImageStore.delete(log.getId());
             markFailed(log);
             FoodService.log.warn("음식 이미지 분석 요청 실패 userId={}, aiLogId={}, responseCode={}", userId, log.getId(), e.getStatus(), e);
             throw e;
         } catch (IOException e){
+            analysisImageStore.delete(log.getId());
             markFailed(log);
             FoodService.log.error("이미지 바이트 읽기 실패 userId={}, aiLogId={}", userId, log.getId(), e);
             throw new CustomException(ResponseCode.AI_SERVER_REQUEST_FAILED);
@@ -118,6 +120,11 @@ public class FoodService {
                 processedResult.getInferenceTimeMs(),
                 processedResult.getAnalysisStatus()
         );
+
+        if (processedResult.getAnalysisStatus() != AnalysisStatus.PROCESSING) {
+            analysisImageStore.delete(analysisLog.getId());
+        }
+
         aiAnalysisLogRepository.save(analysisLog);
 
         log.info(

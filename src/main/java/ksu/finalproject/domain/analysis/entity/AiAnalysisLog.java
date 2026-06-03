@@ -53,10 +53,6 @@ public class AiAnalysisLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // AI 서버 접수 성공 -> rawOutput 저장, 상태를 PROCESSING으로 전환
-    public void success(String rawOutput) {
-
-    }
 
     // AI 서버 요청 실패 -> 상태를 FAILED로 전환
     public void fail() {

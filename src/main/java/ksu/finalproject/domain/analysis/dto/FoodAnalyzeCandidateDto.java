@@ -1,7 +1,6 @@
 package ksu.finalproject.domain.analysis.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.Column;
 import ksu.finalproject.domain.analysis.entity.DataSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +14,9 @@ import lombok.NoArgsConstructor;
 public class FoodAnalyzeCandidateDto {
     @JsonProperty("ai_model_index")
     private Integer aiModelIndex;
+
+    @JsonProperty("food_id")
+    private Long foodId;
 
     @JsonProperty("confidence_score")
     private Double confidenceScore;

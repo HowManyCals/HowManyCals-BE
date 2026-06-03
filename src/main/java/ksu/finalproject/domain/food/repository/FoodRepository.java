@@ -12,43 +12,87 @@ import java.util.List;
 
 @Repository
 public interface FoodRepository extends JpaRepository<Food, Long> {
-	List<Food> findAllByFoodNameIn(Collection<String> foodNames);
+    List<Food> findAllByFoodNameIn(Collection<String> foodNames);
 
-	List<Food> findAllByIsActiveTrue();
+    List<Food> findAllByIsActiveTrue();
 
-	long countByIsActiveTrue();
+    long countByIsActiveTrue();
 
-	@Query("""
-	        select distinct f.mainCategory
-	        from Food f
-	        where f.isActive = true
-	          and f.mainCategory is not null
-	          and f.mainCategory <> ''
-	        order by f.mainCategory asc
-	        """)
-	List<String> findDistinctActiveMainCategories();
+    @Query("""
+            select distinct f.mainCategory
+            from Food f
+            where f.isActive = true
+              and f.mainCategory is not null
+              and f.mainCategory <> ''
+            order by f.mainCategory asc
+            """)
+    List<String> findDistinctActiveMainCategories();
 
-	@Query("""
-	        select f
-	        from Food f
-	        where f.isActive = true
-	          and replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') = :normalizedValue
-	        order by f.id asc
-	        """)
-	List<Food> findAllActiveByNormalizedSubCategoryExact(@Param("normalizedValue") String normalizedValue);
+    @Query("""
+            select f
+            from Food f
+            where f.isActive = true
+              and replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') = :normalizedValue
+            order by f.id asc
+            """)
+    List<Food> findAllActiveByNormalizedSubCategoryExact(@Param("normalizedValue") String normalizedValue);
 
-	@Query("""
-	        select f
-	        from Food f
-	        where f.isActive = true
-	          and (
-	               replace(replace(lower(coalesce(f.foodName, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
-	            or replace(replace(lower(coalesce(f.mainCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
-	            or replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
-	            or replace(replace(lower(coalesce(f.detailCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
-	          )
-	        order by f.id asc
-	        """)
-	List<Food> searchActiveFoodsByNormalizedKeyword(@Param("normalizedKeyword") String normalizedKeyword, Pageable pageable);
+    @Query("""
+            select f
+            from Food f
+            where f.isActive = true
+              and replace(replace(lower(coalesce(f.mainCategory, '')), ' ', ''), '_', '') = :normalizedMainCategory
+              and replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') = :normalizedSubCategory
+            order by f.id asc
+            """)
+    List<Food> findAllActiveByNormalizedMainCategoryAndNormalizedSubCategoryExact(
+            @Param("normalizedMainCategory") String normalizedMainCategory,
+            @Param("normalizedSubCategory") String normalizedSubCategory
+    );
+
+    @Query("""
+            select f
+            from Food f
+            where f.isActive = true
+              and replace(replace(lower(coalesce(f.mainCategory, '')), ' ', ''), '_', '') = :normalizedMainCategory
+              and replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedSubCategory, '%')
+            order by f.id asc
+            """)
+    List<Food> searchActiveFoodsByNormalizedMainCategoryAndNormalizedSubCategoryContains(
+            @Param("normalizedMainCategory") String normalizedMainCategory,
+            @Param("normalizedSubCategory") String normalizedSubCategory,
+            Pageable pageable
+    );
+
+    @Query("""
+            select f
+            from Food f
+            where f.isActive = true
+              and replace(replace(lower(coalesce(f.mainCategory, '')), ' ', ''), '_', '') = :normalizedMainCategory
+              and (
+                   replace(replace(lower(coalesce(f.foodName, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+                or replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+                or replace(replace(lower(coalesce(f.detailCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+              )
+            order by f.id asc
+            """)
+    List<Food> searchActiveFoodsByNormalizedMainCategoryAndNormalizedKeyword(
+            @Param("normalizedMainCategory") String normalizedMainCategory,
+            @Param("normalizedKeyword") String normalizedKeyword,
+            Pageable pageable
+    );
+
+    @Query("""
+            select f
+            from Food f
+            where f.isActive = true
+              and (
+                   replace(replace(lower(coalesce(f.foodName, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+                or replace(replace(lower(coalesce(f.mainCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+                or replace(replace(lower(coalesce(f.subCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+                or replace(replace(lower(coalesce(f.detailCategory, '')), ' ', ''), '_', '') like concat('%', :normalizedKeyword, '%')
+              )
+            order by f.id asc
+            """)
+    List<Food> searchActiveFoodsByNormalizedKeyword(@Param("normalizedKeyword") String normalizedKeyword, Pageable pageable);
 }
-

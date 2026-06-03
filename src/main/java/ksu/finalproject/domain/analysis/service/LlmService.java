@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -67,19 +68,21 @@ public class LlmService {
             }
 
             LlmFoodAnalysisResponseDto parsed = parseResponse(rawText, objectMapper);
-            if (parsed == null || !StringUtils.hasText(parsed.getBaseFood())) {
+            if (parsed == null || (!StringUtils.hasText(parsed.getRecognizedName()) && !StringUtils.hasText(parsed.getBaseFood()))) {
                 log.warn("LLM fallback 실패 - Gemini 응답 파싱 결과가 비어 있습니다. aiLogId={}, rawTextPreview={}",
                         request.getAiLogId(),
                         preview(rawText));
                 return null;
             }
 
-            log.info("LLM fallback 성공 aiLogId={}, originalFoodName={}, llmMainCategory={}, llmBaseFood={}, modifierCount={}",
+            log.info("LLM fallback 성공 aiLogId={}, originalFoodName={}, recognizedName={}, llmMainCategory={}, llmBaseFood={}, modifierCount={}, searchTermCount={}",
                     request.getAiLogId(),
                     request.getOriginalFoodName(),
+                    parsed.getRecognizedName(),
                     parsed.getMainCategory(),
                     parsed.getBaseFood(),
-                    parsed.getModifiers() != null ? parsed.getModifiers().size() : 0);
+                    parsed.getModifiers() != null ? parsed.getModifiers().size() : 0,
+                    parsed.getSearchTerms() != null ? parsed.getSearchTerms().size() : 0);
             return parsed;
         } catch (RestClientException e) {
             log.error("LLM fallback 실패 - Gemini 호출 예외 aiLogId={}", request.getAiLogId(), e);
@@ -113,7 +116,7 @@ public class LlmService {
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.1);
         generationConfig.put("topP", 0.8);
-        generationConfig.put("maxOutputTokens", 256);
+        generationConfig.put("maxOutputTokens", 384);
         generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -124,21 +127,29 @@ public class LlmService {
 
     private String buildPrompt() {
         return """
-                너는 음식 이미지에서 우리 서비스 DB 검색용 구조화 정보를 추출하는 모델이다.
-                목표는 자연스러운 음식명을 말하는 것이 아니라, DB 검색에 유리한 3개 필드
-                `main_category`, `base_food`, `modifiers`
-                를 안정적으로 반환하는 것이다.
+                너는 음식 이미지에서 우리 서비스의 DB 검색용 구조화 정보를 추출하는 모델이다.
+
+                목표는 메인 음식 1개에 대해 아래 5개 값을 안정적으로 반환하는 것이다.
+                1) 사용자에게 보여줄 이름
+                2) DB 후보군을 줄이기 위한 분류 값
+                3) DB 검색 확장용 보조 키워드
 
                 반드시 아래 규칙을 지켜라.
 
                 [출력 규칙]
                 1. 반드시 JSON 객체 1개만 반환한다.
-                2. 키는 정확히 다음 3개만 사용한다.
+                2. 키는 정확히 다음 5개만 사용한다.
+                   - recognized_name
                    - main_category
                    - base_food
                    - modifiers
+                   - search_terms
                 3. 설명, 이유, 마크다운, 코드블록 없이 JSON만 반환한다.
                 4. modifiers는 없으면 빈 배열 []로 반환한다.
+                5. search_terms는 없으면 빈 배열 []로 반환한다.
+                6. modifiers는 최대 2개까지만 반환한다.
+                7. search_terms는 최대 6개까지만 반환한다.
+                8. search_terms의 첫 번째 값은 반드시 recognized_name과 동일하게 반환한다.
 
                 [main_category 고정 enum]
                 main_category는 아래 25개 값 중 정확히 하나만 반환해야 한다.
@@ -170,133 +181,125 @@ public class LlmService {
                 - 채소, 해조류
                 - 튀김류
 
+                [recognized_name 규칙]
+                recognized_name은 사용자가 봤을 때 가장 자연스러운 음식 이름이어야 한다.
+                여러 음식이 있으면 가장 크고 중심인 메인 음식 1개만 선택한다.
+                세트, 사이즈, 수량, 컵 크기 같은 부가 표현은 빼되,
+                실제 제품명/메뉴명을 구분하는 핵심 표현은 유지한다.
+
+                좋은 예:
+                - 후라이드 치킨
+                - 양념 치킨
+                - 카페라떼
+                - 닭가슴살 직화통살구이
+                - 더 건강한 닭가슴살 직화통살구이
+                - 바지락 칼국수
+                - 새우 감자 피자
+
                 [main_category 판단 기준]
                 아래 기준으로 가장 가까운 카테고리 1개를 선택한다.
 
                 - 곡류, 서류 제품: 고구마, 감자범벅, 팝콘처럼 곡물/서류 단품 또는 단순 가공품
                 - 과일류: 과일 단품, 과일컵, 과일 기반 식품 중 음식보다 과일 자체가 중심인 경우
                 - 구이류: 구이, 불고기, 스테이크, 꼬치구이, 생선구이처럼 굽기가 중심
-                - 국 및 탕류: 맑거나 일반적인 국물 요리. 예: 된장국, 무국, 미역국, 곰탕, 갈비탕
+                - 국 및 탕류: 맑거나 일반적인 국물 요리
                 - 김치류: 배추김치, 깍두기, 동치미, 물김치 등 김치류
-                - 나물·숙채류: 익히거나 데친 채소/나물 반찬. 예: 시금치나물, 숙주나물, 콩나물무침
+                - 나물·숙채류: 익히거나 데친 채소/나물 반찬
                 - 두류, 견과 및 종실류: 견과, 콩류, 종실류 단품
-                - 면 및 만두류: 칼국수, 국수, 냉면, 우동, 짬뽕, 라면, 스파게티, 만두, 떡국, 떡만두국
-                - 밥류: 밥이 정체성의 중심인 요리. 예: 국밥, 김밥, 덮밥, 볶음밥, 비빔밥, 초밥, 주먹밥, 오므라이스, 카레라이스
-                - 볶음류: 볶음이 중심인 요리. 예: 떡볶이, 잡채, 김치볶음, 감자볶음, 고기볶음
-                - 빵 및 과자류: 피자, 케이크, 버거, 도넛, 샌드위치, 와플, 마카롱, 베이글, 파이/만주, 떡류, 제과류
-                - 생채·무침류: 생채, 겉절이, 샐러드, 초무침처럼 생채소/해산물 무침이 중심
-                - 수·조·어·육류: 달걀, 회, 육회, 소시지, 대구포처럼 동물성 식재료 단품/단순 식품
+                - 면 및 만두류: 칼국수, 국수, 냉면, 우동, 짬뽕, 라면, 스파게티, 만두, 떡국
+                - 밥류: 국밥, 김밥, 덮밥, 볶음밥, 비빔밥, 초밥, 오므라이스, 카레라이스
+                - 볶음류: 떡볶이, 잡채, 김치볶음, 감자볶음, 고기볶음
+                - 빵 및 과자류: 피자, 케이크, 버거, 도넛, 샌드위치, 와플, 베이글, 파이/만주, 떡류
+                - 생채·무침류: 생채, 겉절이, 샐러드, 초무침
+                - 수·조·어·육류: 달걀, 회, 육회, 소시지, 닭가슴살 제품처럼 동물성 식재료/가공식품 중심
                 - 유제품류 및 빙과류: 아이스크림, 빙수, 요구르트, 우유, 치즈, 샤베트
-                - 음료 및 차류: 커피, 라떼, 스무디, 에이드, 밀크티/버블티, 과ㆍ채주스, 허브차, 홍차
-                - 장류, 양념류: 소스, 드레싱, 장, 초장, 간장, 카레소스, 짜장소스 등 양념/소스 제품
-                - 장아찌·절임류: 장아찌, 오이지, 단무지, 치킨무 등 절임류
-                - 전·적 및 부침류: 전, 부침, 달걀말이, 파전, 김치전, 두부부침처럼 팬에 부친 음식
-                - 젓갈류: 새우젓, 오징어젓, 게장, 꽃게장, 식해 등
-                - 조림류: 간장/양념/국물에 졸이거나 조린 음식. 예: 장조림, 고등어조림, 코다리조림, 두부조림
+                - 음료 및 차류: 커피, 라떼, 스무디, 에이드, 밀크티/버블티, 과·채주스, 허브차, 홍차
+                - 장류, 양념류: 소스, 드레싱, 장, 초장, 간장, 카레소스, 짜장소스
+                - 장아찌·절임류: 장아찌, 오이지, 단무지, 치킨무
+                - 전·적 및 부침류: 전, 부침, 달걀말이, 파전, 김치전, 두부부침
+                - 젓갈류: 새우젓, 오징어젓, 게장, 꽃게장, 식해
+                - 조림류: 장조림, 고등어조림, 코다리조림, 두부조림
                 - 죽 및 스프류: 죽, 미음, 전복죽, 팥죽, 스프
-                - 찌개 및 전골류: 찌개, 전골, 매운탕, 감자탕, 부대찌개, 순두부찌개처럼 걸쭉하거나 강한 국물의 한 냄비 요리
-                - 찜류: 찜, 달걀찜, 갈비찜, 아귀찜, 꼬막찜처럼 찌는 조리법이 중심
+                - 찌개 및 전골류: 찌개, 전골, 매운탕, 감자탕, 부대찌개, 순두부찌개
+                - 찜류: 찜, 달걀찜, 갈비찜, 아귀찜, 꼬막찜
                 - 채소, 해조류: 채소/해조류 단품 또는 매우 단순한 형태
-                - 튀김류: 닭튀김, 감자튀김, 새우튀김, 오징어튀김, 치즈스틱, 치즈볼, 돈가스, 탕수육처럼 튀김이 중심
-
-                [중요한 경계 규칙]
-                1. 국물 음식 경계
-                - 면이 중심이면 무조건 `면 및 만두류`
-                - 밥이 중심이면 무조건 `밥류`
-                - 죽/미음/스프면 `죽 및 스프류`
-                - 찌개/전골/매운탕/감자탕처럼 진하거나 전골형이면 `찌개 및 전골류`
-                - 그 외 일반 국/탕은 `국 및 탕류`
-
-                2. 밥류 우선 규칙
-                - 국밥, 덮밥, 볶음밥, 비빔밥, 김밥, 주먹밥, 초밥, 오므라이스, 카레라이스는 국물이나 토핑이 보여도 `밥류`
-
-                3. 조리 방식 경계
-                - 팬에 부친 것: `전·적 및 부침류`
-                - 기름에 튀긴 것: `튀김류`
-                - 불에 굽거나 직화/석쇠/그릴: `구이류`
-                - 양념/국물에 조려낸 것: `조림류`
-                - 찐 것: `찜류`
-                - 볶은 것: `볶음류`
-
-                4. 채소 반찬 경계
-                - 생채, 겉절이, 샐러드, 초무침: `생채·무침류`
-                - 데치거나 익힌 나물 반찬: `나물·숙채류`
-                - 김치류면 `김치류`
-                - 장아찌/절임이면 `장아찌·절임류`
-
-                5. 음료/디저트 경계
-                - 액체 음료는 `음료 및 차류`
-                - 아이스크림/빙수/요구르트/우유/치즈는 `유제품류 및 빙과류`
-                - 피자, 버거, 샌드위치, 케이크, 도넛, 파이류는 `빵 및 과자류`
+                - 튀김류: 치킨, 감자튀김, 새우튀김, 오징어튀김, 치즈스틱, 치즈볼, 돈가스, 탕수육
 
                 [base_food 규칙]
-                base_food는 서비스 DB의 sub_category에 최대한 가깝게 잡는다.
-                즉, 상품명 전체가 아니라 “핵심 음식 타입”을 반환한다.
-                브랜드명, 매장명, 용량, 개수, 세트명, 광고 문구는 제외한다.
-                base_food는 자연어 음식명이 아니라, 서비스 DB의 sub_category에 저장될 법한 대표명으로 반환한다.
+                base_food는 recognized_name에서 핵심 음식 타입만 추출한 값이다.
+                너무 넓은 카테고리로 일반화하면 안 되고, 전체 메뉴명을 그대로 반복해도 안 된다.
+                DB 내부 대표명으로 강제 치환하지 말고, 자연스러운 음식 타입으로 반환한다.
 
                 좋은 예:
                 - 바지락 칼국수 -> 칼국수
-                - 순대국밥 -> 국밥
-                - 후라이드 치킨 -> 닭튀김
-                - 카페라떼 -> 라떼
-                - 아메리카노 -> 커피
-                - 클래식 애플파이 -> 파이/만주
                 - 미트볼 스파게티 -> 스파게티
-                - 불고기피자 -> 피자
+                - 카페라떼 -> 라떼
+                - 새우 감자 피자 -> 피자
+                - 후라이드 치킨 -> 치킨
+                - 양념 치킨 -> 치킨
+                - 닭가슴살 직화통살구이 -> 닭가슴살
 
-                나쁜 예:
-                - “맛있는 후라이드 치킨 세트”
-                - “OO브랜드 아메리카노”
-                - “대컵 카페라떼”
-                - “불고기 피자 M”
+                금지 예:
+                - 후라이드 치킨 -> 닭튀김
+                - 양념 치킨 -> 닭튀김
+                - 카페라떼 -> 커피
+                - 새우 감자 피자 -> 빵 및 과자류
 
                 [modifiers 규칙]
-                modifiers는 base_food를 더 구체화하는 변형명만 반환한다.
-                모르면 추측하지 말고 []를 반환한다.
-                modifiers는 detail_category 또는 food_name suffix 검색에 직접 사용할 수 있는 표현으로 반환한다.
-                modifiers는 최대 2개까지만 반환한다.
-
-                포함 가능:
-                - 핵심 재료
-                - 조리 스타일
-                - 맛/시즈닝
-                - 고정된 변형명
-
-                제외:
-                - 브랜드명
-                - 매장명
-                - 용량
-                - 개수
-                - 세트/프로모션 문구
-                - 포장 상태 설명
+                modifiers는 base_food를 더 구체화하는 핵심 표현만 반환한다.
+                브랜드명, 매장명, 용량, 세트명, 사이즈는 넣지 않는다.
+                가능하면 검색에 유리한 구문 단위로 반환한다.
 
                 좋은 예:
                 - 바지락 칼국수 -> ["바지락"]
-                - 순대국밥 -> ["순대국밥"]
-                - 후라이드 치킨 -> ["후라이드 치킨"]
-                - 카페라떼 -> ["카페라떼"]
-                - 클래식 애플파이 -> ["클래식애플파이"]
                 - 미트볼 스파게티 -> ["미트볼"]
-                - 불고기피자 -> ["불고기피자"]
+                - 카페라떼 -> ["카페"]
+                - 후라이드 치킨 -> ["후라이드"]
+                - 양념 치킨 -> ["양념"]
+                - 닭가슴살 직화통살구이 -> ["직화통살구이"]
+                - 새우 감자 피자 -> ["새우", "감자"]
 
-                [복수 음식 규칙]
-                - 사진에 여러 음식이 있으면 가장 크고 중심인 메인 음식 1개만 선택한다.
-                - 반찬, 토핑, 사이드, 음료는 메인 음식이 아니면 선택하지 않는다.
-                - 다만 메인 음식을 구분하는 핵심 재료라면 modifiers에만 반영한다.
+                [search_terms 규칙]
+                search_terms는 DB 검색 확장용 보조 키워드다.
+                recognized_name, base_food, modifiers의 의미를 바꾸지 말고,
+                같은 메뉴를 다른 표기/언어/띄어쓰기 형태로 찾기 위한 검색어만 넣는다.
+
+                허용:
+                - 띄어쓰기/붙여쓰기 변형
+                - 한글/영문 표기 변형
+                - 제품명에서 브랜드/수식어를 일부 제거한 핵심 검색형
+
+                금지:
+                - 더 넓은 카테고리로 일반화
+                - 다른 음식으로 의미 변경
+                - DB 내부 대표명으로 강제 치환
+
+                좋은 예:
+                - 후라이드 치킨 -> ["후라이드 치킨", "후라이드치킨", "프라이드 치킨", "프라이드치킨", "fried chicken"]
+                - 카페라떼 -> ["카페라떼", "카페 라떼", "cafe latte"]
+                - 새우 감자 피자 -> ["새우 감자 피자", "새우피자", "감자피자", "shrimp pizza", "potato pizza"]
+                - 닭가슴살 직화통살구이 -> ["닭가슴살 직화통살구이", "닭가슴살직화통살구이", "직화 닭가슴살", "grilled chicken breast"]
+                - 더 건강한 닭가슴살 직화통살구이 -> ["더 건강한 닭가슴살 직화통살구이", "닭가슴살 직화통살구이", "닭가슴살직화통살구이", "직화통살구이", "grilled chicken breast"]
+
+                금지 예:
+                - 후라이드 치킨 -> ["닭튀김"]
+                - 양념 치킨 -> ["닭튀김"]
+                - 카페라떼 -> ["커피"]
+                - 새우 감자 피자 -> ["빵", "과자"]
 
                 [불확실성 규칙]
                 - main_category는 반드시 1개를 선택한다.
-                - base_food는 가장 보수적이고 안정적인 핵심 음식 타입을 선택한다.
-                - modifiers는 보이는 것만 쓴다. 보이지 않는 재료는 추정하지 않는다.
+                - recognized_name은 가장 보수적이고 자연스러운 음식명으로 쓴다.
+                - base_food는 recognized_name의 핵심 음식 타입만 남긴다.
+                - modifiers는 보이는 것만 쓴다.
+                - search_terms는 보수적으로 작성한다. 확실하지 않으면 적게 넣는다.
 
                 [출력 예시]
-                {"main_category":"면 및 만두류","base_food":"칼국수","modifiers":["바지락"]}
-                {"main_category":"밥류","base_food":"국밥","modifiers":["순대국밥"]}
-                {"main_category":"튀김류","base_food":"닭튀김","modifiers":["후라이드 치킨"]}
-                {"main_category":"빵 및 과자류","base_food":"파이/만주","modifiers":["클래식애플파이"]}
-                {"main_category":"면 및 만두류","base_food":"스파게티","modifiers":["미트볼"]}
-                {"main_category":"음료 및 차류","base_food":"라떼","modifiers":["카페라떼"]}
+                {"recognized_name":"후라이드 치킨","main_category":"튀김류","base_food":"치킨","modifiers":["후라이드"],"search_terms":["후라이드 치킨","후라이드치킨","프라이드 치킨","프라이드치킨","fried chicken"]}
+                {"recognized_name":"카페라떼","main_category":"음료 및 차류","base_food":"라떼","modifiers":["카페"],"search_terms":["카페라떼","카페 라떼","cafe latte"]}
+                {"recognized_name":"닭가슴살 직화통살구이","main_category":"수·조·어·육류","base_food":"닭가슴살","modifiers":["직화통살구이"],"search_terms":["닭가슴살 직화통살구이","닭가슴살직화통살구이","직화 닭가슴살","grilled chicken breast"]}
+                {"recognized_name":"바지락 칼국수","main_category":"면 및 만두류","base_food":"칼국수","modifiers":["바지락"],"search_terms":["바지락 칼국수","바지락칼국수","clam kalguksu"]}
+                {"recognized_name":"새우 감자 피자","main_category":"빵 및 과자류","base_food":"피자","modifiers":["새우","감자"],"search_terms":["새우 감자 피자","새우피자","감자피자","shrimp pizza","potato pizza"]}
                 """;
     }
 
@@ -334,7 +337,7 @@ public class LlmService {
         return textObject instanceof String text ? text : null;
     }
 
-    static LlmFoodAnalysisResponseDto parseResponse(String rawText, ObjectMapper objectMapper) {
+    static LlmFoodAnalysisResponseDto parseResponse(String rawText, ObjectMapper objectMapper) throws Exception {
         String sanitized = rawText.trim();
         if (sanitized.contains("```")) {
             sanitized = sanitized.replace("```json", "")
@@ -349,24 +352,46 @@ public class LlmService {
         }
 
         JsonNode root = objectMapper.readTree(jsonBody.getBytes(StandardCharsets.UTF_8));
+        String recognizedName = objectMapper.convertValue(root.path("recognized_name"), String.class);
         String mainCategory = objectMapper.convertValue(root.path("main_category"), String.class);
         String baseFood = objectMapper.convertValue(root.path("base_food"), String.class);
         List<String> modifiers = objectMapper.convertValue(
                 root.path("modifiers"),
                 objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
         );
+        List<String> searchTerms = objectMapper.convertValue(
+                root.path("search_terms"),
+                objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        );
 
-        if (!StringUtils.hasText(baseFood)) {
+        if (!StringUtils.hasText(recognizedName) && !StringUtils.hasText(baseFood)) {
             return null;
         }
 
+        String normalizedRecognizedName = StringUtils.hasText(recognizedName) ? recognizedName.trim() : null;
+        String normalizedBaseFood = StringUtils.hasText(baseFood) ? baseFood.trim() : null;
+
+        LinkedHashSet<String> normalizedSearchTerms = new LinkedHashSet<>();
+        if (StringUtils.hasText(normalizedRecognizedName)) {
+            normalizedSearchTerms.add(normalizedRecognizedName);
+        }
+        if (searchTerms != null) {
+            searchTerms.stream()
+                    .filter(StringUtils::hasText)
+                    .map(String::trim)
+                    .forEach(normalizedSearchTerms::add);
+        }
+
         return LlmFoodAnalysisResponseDto.builder()
+                .recognizedName(StringUtils.hasText(normalizedRecognizedName) ? normalizedRecognizedName : normalizedBaseFood)
                 .mainCategory(StringUtils.hasText(mainCategory) ? mainCategory.trim() : null)
-                .baseFood(baseFood.trim())
+                .baseFood(normalizedBaseFood)
                 .modifiers(modifiers == null ? List.of() : modifiers.stream()
                         .filter(StringUtils::hasText)
                         .map(String::trim)
+                        .distinct()
                         .toList())
+                .searchTerms(normalizedSearchTerms.stream().toList())
                 .build();
     }
 

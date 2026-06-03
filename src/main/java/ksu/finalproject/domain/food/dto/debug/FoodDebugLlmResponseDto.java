@@ -1,4 +1,4 @@
-package ksu.finalproject.domain.analysis.dto;
+package ksu.finalproject.domain.food.dto.debug;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -8,14 +8,13 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * LLM(Gemini)이 구조화된 음식 분류 결과를 반환하는 DTO
- */
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LlmFoodAnalysisResponseDto {
+public class FoodDebugLlmResponseDto {
+    @JsonProperty("ai_log_id")
+    private Long aiLogId;
 
     @JsonProperty("recognized_name")
     private String recognizedName;
@@ -31,4 +30,19 @@ public class LlmFoodAnalysisResponseDto {
 
     @JsonProperty("search_terms")
     private List<String> searchTerms;
+
+    @JsonProperty("normalized_recognized_name")
+    private String normalizedRecognizedName;
+
+    @JsonProperty("normalized_main_category")
+    private String normalizedMainCategory;
+
+    @JsonProperty("normalized_base_food")
+    private String normalizedBaseFood;
+
+    @JsonProperty("normalized_modifiers")
+    private List<String> normalizedModifiers;
+
+    @JsonProperty("normalized_search_terms")
+    private List<String> normalizedSearchTerms;
 }

@@ -16,7 +16,6 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -28,52 +27,27 @@ public class FoodMatchService {
 
     private static final int DEFAULT_CANDIDATE_LIMIT = 200;
     private static final int MANUAL_SEARCH_LIMIT = 20;
-    private static final int MIN_BASE_CANDIDATE_POOL = 8;
-    private static final int MAIN_CATEGORY_EXACT_BONUS = 20;
-    private static final int MAIN_CATEGORY_MISMATCH_PENALTY = 18;
+    private static final int MIN_FILTERED_CANDIDATE_POOL = 20;
+    private static final int MAIN_CATEGORY_EXACT_BONUS = 8;
+    private static final int MAIN_CATEGORY_MISMATCH_PENALTY = 8;
 
-    private static final Map<String, String> TEXT_SYNONYM_REPLACEMENTS = Map.ofEntries(
-            Map.entry("후라이드", "프라이드"),
-            Map.entry("짜장", "자장"),
-            Map.entry("까르보나라", "카르보나라"),
-            Map.entry("라테", "라떼"),
-            Map.entry("애플 파이", "애플파이")
-    );
+    private static final int RECOGNIZED_FOOD_NAME_EXACT_SCORE = 140;
+    private static final int RECOGNIZED_CANONICAL_EXACT_SCORE = 130;
+    private static final int RECOGNIZED_SUFFIX_EXACT_SCORE = 125;
+    private static final int RECOGNIZED_FOOD_NAME_CONTAINS_SCORE = 95;
+    private static final int RECOGNIZED_CANONICAL_CONTAINS_SCORE = 85;
+    private static final int RECOGNIZED_SUFFIX_CONTAINS_SCORE = 80;
+    private static final int SEARCH_TERM_EXACT_SCORE = 75;
+    private static final int SEARCH_TERM_CONTAINS_SCORE = 40;
+    private static final int BASE_FOOD_SUB_EXACT_SCORE = 55;
+    private static final int BASE_FOOD_SUB_CONTAINS_SCORE = 35;
+    private static final int BASE_FOOD_FOOD_NAME_CONTAINS_SCORE = 18;
+    private static final int MODIFIER_DETAIL_EXACT_SCORE = 24;
+    private static final int MODIFIER_SUFFIX_CONTAINS_SCORE = 18;
+    private static final int MODIFIER_FOOD_NAME_CONTAINS_SCORE = 12;
 
-    private static final Map<String, String> BASE_FOOD_ALIASES = Map.ofEntries(
-            Map.entry("치킨", "닭튀김"),
-            Map.entry("후라이드치킨", "닭튀김"),
-            Map.entry("프라이드치킨", "닭튀김"),
-            Map.entry("양념치킨", "닭튀김"),
-            Map.entry("치킨윙", "닭튀김"),
-            Map.entry("닭가슴살구이", "닭구이"),
-            Map.entry("닭가슴살", "닭구이"),
-            Map.entry("닭다리구이", "닭구이"),
-            Map.entry("닭다리", "닭구이"),
-            Map.entry("치킨스테이크", "닭구이"),
-            Map.entry("아메리카노", "커피"),
-            Map.entry("콜드브루", "커피"),
-            Map.entry("드립커피", "커피"),
-            Map.entry("에스프레소", "커피"),
-            Map.entry("카페라떼", "라떼"),
-            Map.entry("애플파이", "파이/만주"),
-            Map.entry("미트볼스파게티", "스파게티"),
-            Map.entry("바지락칼국수", "칼국수"),
-            Map.entry("순대국밥", "국밥")
-    );
-
-    private static final Set<String> MODIFIER_NOISE_TERMS = Set.of(
-            "세트", "콤보", "단품", "대", "중", "소",
-            "라지", "레귤러", "스몰", "미디엄",
-            "set", "combo", "single", "large", "regular", "small", "medium",
-            "hot", "ice", "iced", "tall", "grande", "venti"
-    );
-
-    private static final Pattern MODIFIER_MEASUREMENT_PATTERN = Pattern.compile(
-            "(?i)\\b\\d+(?:\\.\\d+)?\\s*(?:g|kg|ml|l|oz|pcs|pc|ea|인분|인|개입|개)\\b"
-    );
-    private static final Pattern NON_SEARCHABLE_PATTERN = Pattern.compile("[^0-9a-zA-Z가-힣/\\s]");
-    private static final Pattern MODIFIER_SPLIT_PATTERN = Pattern.compile("[\\s/_,-]+");
+    private static final Pattern MULTI_SPACE_PATTERN = Pattern.compile("\\s+");
+    private static final Pattern MEASUREMENT_PATTERN = Pattern.compile("(?i)\\b\\d+(?:\\.\\d+)?\\s*(?:g|kg|ml|l|oz|pcs|pc|ea|인분|인|개입|개)\\b");
 
     private final FoodRepository foodRepository;
 
@@ -84,194 +58,387 @@ public class FoodMatchService {
         return foodRepository.findDistinctActiveMainCategories();
     }
 
-    public List<MatchResult> matchFoods(String mainCategory, String baseFood, List<String> modifiers, int limit) {
-        String normalizedMainCategory = normalizeText(mainCategory);
-        String normalizedRawBaseFood = normalizeText(baseFood);
-        String normalizedBaseFood = normalizeBaseFood(baseFood);
-        List<String> normalizedModifiers = normalizeModifiers(baseFood, modifiers);
+    public List<MatchResult> matchFoods(
+            String mainCategory,
+            String baseFood,
+            String recognizedName,
+            List<String> modifiers,
+            List<String> searchTerms,
+            int limit
+    ) {
+        String normalizedMainCategory = normalizeKey(mainCategory);
+        String normalizedBaseFood = normalizeKey(baseFood);
+        String normalizedRecognizedName = normalizeKey(recognizedName);
+        List<String> normalizedModifiers = normalizeTerms(modifiers, null);
+        List<String> normalizedSearchTerms = normalizeTerms(searchTerms, normalizedRecognizedName);
 
-        if (!StringUtils.hasText(normalizedBaseFood)) {
-            log.info("food-match skip - empty baseFood mainCategory={}, rawBaseFood={}, modifiers={}",
+        if (!StringUtils.hasText(normalizedRecognizedName) && !StringUtils.hasText(normalizedBaseFood)) {
+            log.info("food-match skip - empty recognized/base mainCategory={}, recognizedName={}, baseFood={}",
                     mainCategory,
-                    baseFood,
-                    modifiers);
+                    recognizedName,
+                    baseFood);
             return List.of();
         }
 
-        log.info("food-match start mainCategory={}, normalizedMainCategory={}, rawBaseFood={}, normalizedRawBaseFood={}, normalizedBaseFood={}, modifiers={}, normalizedModifiers={}",
+        log.info("food-match start mainCategory={}, normalizedMainCategory={}, baseFood={}, normalizedBaseFood={}, recognizedName={}, normalizedRecognizedName={}, modifiers={}, normalizedModifiers={}, searchTerms={}, normalizedSearchTerms={}",
                 mainCategory,
                 normalizedMainCategory,
                 baseFood,
-                normalizedRawBaseFood,
                 normalizedBaseFood,
+                recognizedName,
+                normalizedRecognizedName,
                 modifiers,
-                normalizedModifiers);
+                normalizedModifiers,
+                searchTerms,
+                normalizedSearchTerms);
 
-        Set<Food> candidates = new LinkedHashSet<>();
+        LinkedHashSet<Food> candidates = new LinkedHashSet<>();
         List<String> stageLogs = new ArrayList<>();
 
-        int beforeExact = candidates.size();
-        candidates.addAll(foodRepository.findAllActiveByNormalizedSubCategoryExact(normalizedBaseFood));
-        stageLogs.add("sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
+        collectFilteredCandidates(candidates, stageLogs, normalizedMainCategory, normalizedBaseFood);
+        collectKeywordCandidates(candidates, stageLogs, normalizedMainCategory, normalizedRecognizedName, normalizedSearchTerms, normalizedBaseFood);
 
-        addKeywordSearchResults(candidates, stageLogs, "base_keyword_canonical", List.of(normalizedBaseFood));
-
-        if (StringUtils.hasText(normalizedRawBaseFood) && !normalizedRawBaseFood.equals(normalizedBaseFood)) {
-            addKeywordSearchResults(candidates, stageLogs, "base_keyword_raw", List.of(normalizedRawBaseFood));
+        if (candidates.isEmpty() && StringUtils.hasText(normalizedBaseFood)) {
+            int beforeExact = candidates.size();
+            candidates.addAll(foodRepository.findAllActiveByNormalizedSubCategoryExact(normalizedBaseFood));
+            stageLogs.add("global_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
         }
 
-        if (candidates.size() < MIN_BASE_CANDIDATE_POOL && !normalizedModifiers.isEmpty()) {
-            addKeywordSearchResults(candidates, stageLogs, "modifier_keyword", normalizedModifiers);
+        if (candidates.isEmpty()) {
+            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_recognized", List.of(normalizedRecognizedName));
+            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_search_terms", normalizedSearchTerms);
         }
 
-        log.info("food-match candidate-pool mainCategory={}, normalizedBaseFood={}, stageLogs={}",
+        log.info("food-match candidate-pool stageLogs={}, candidateCount={}", stageLogs, candidates.size());
+
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+
+        List<Food> exactFoodNameMatches = filterFoodNameExact(candidates, normalizedRecognizedName);
+        if (!exactFoodNameMatches.isEmpty()) {
+            log.info("food-match recognized food_name exact hit count={}", exactFoodNameMatches.size());
+            return rankSubset(
+                    exactFoodNameMatches,
+                    normalizedMainCategory,
+                    normalizedBaseFood,
+                    normalizedRecognizedName,
+                    normalizedModifiers,
+                    normalizedSearchTerms,
+                    limit
+            );
+        }
+
+        List<Food> exactCanonicalMatches = filterCanonicalExact(candidates, normalizedRecognizedName);
+        if (!exactCanonicalMatches.isEmpty()) {
+            log.info("food-match recognized canonical exact hit count={}", exactCanonicalMatches.size());
+            return rankSubset(
+                    exactCanonicalMatches,
+                    normalizedMainCategory,
+                    normalizedBaseFood,
+                    normalizedRecognizedName,
+                    normalizedModifiers,
+                    normalizedSearchTerms,
+                    limit
+            );
+        }
+
+        List<Food> exactSearchTermMatches = filterSearchTermExact(candidates, normalizedSearchTerms);
+        if (!exactSearchTermMatches.isEmpty()) {
+            log.info("food-match search-term exact hit count={}", exactSearchTermMatches.size());
+            return rankSubset(
+                    exactSearchTermMatches,
+                    normalizedMainCategory,
+                    normalizedBaseFood,
+                    normalizedRecognizedName,
+                    normalizedModifiers,
+                    normalizedSearchTerms,
+                    limit
+            );
+        }
+
+        List<MatchResult> ranked = rankSubset(
+                new ArrayList<>(candidates),
                 normalizedMainCategory,
                 normalizedBaseFood,
-                stageLogs);
-
-        List<MatchResult> ranked = candidates.stream()
-                .map(food -> score(food, normalizedMainCategory, normalizedBaseFood, normalizedModifiers))
-                .filter(result -> result.score() > 0)
-                .sorted(Comparator.comparingInt(MatchResult::score).reversed()
-                        .thenComparing(result -> result.food().getId()))
-                .limit(limit)
-                .toList();
-
-        log.info("food-match ranked normalizedBaseFood={}, resultCount={}, preview={}",
-                normalizedBaseFood,
-                ranked.size(),
-                summarizeResults(ranked));
-
+                normalizedRecognizedName,
+                normalizedModifiers,
+                normalizedSearchTerms,
+                limit
+        );
+        log.info("food-match ranked resultCount={}, preview={}", ranked.size(), summarizeResults(ranked));
         return ranked;
     }
 
     public List<Food> searchFoods(String query, int limit) {
-        String normalizedQuery = normalizeBaseFood(query);
+        String normalizedQuery = normalizeKey(query);
         if (!StringUtils.hasText(normalizedQuery) || normalizedQuery.length() < 2) {
             return List.of();
         }
 
         LinkedHashSet<Food> results = new LinkedHashSet<>();
         results.addAll(foodRepository.findAllActiveByNormalizedSubCategoryExact(normalizedQuery));
-        results.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(normalizedQuery, PageRequest.of(0, Math.max(limit, MANUAL_SEARCH_LIMIT))));
+        results.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(
+                normalizedQuery,
+                PageRequest.of(0, Math.max(limit, MANUAL_SEARCH_LIMIT))
+        ));
         return results.stream().limit(limit).toList();
     }
 
     public String normalizeAndApplySynonyms(String value) {
-        return normalizeText(value);
+        return normalizeKey(value);
     }
 
-    public String normalizeBaseFood(String value) {
-        String normalized = normalizeText(value);
-        if (!StringUtils.hasText(normalized)) {
-            return null;
+    private void collectFilteredCandidates(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String normalizedMainCategory,
+            String normalizedBaseFood
+    ) {
+        if (!StringUtils.hasText(normalizedMainCategory) || !StringUtils.hasText(normalizedBaseFood)) {
+            return;
         }
 
-        for (Map.Entry<String, String> entry : BASE_FOOD_ALIASES.entrySet()) {
-            String alias = normalizeText(entry.getKey());
-            if (normalized.equals(alias)) {
-                return normalizeText(entry.getValue());
+        int beforeExact = candidates.size();
+        candidates.addAll(foodRepository.findAllActiveByNormalizedMainCategoryAndNormalizedSubCategoryExact(
+                normalizedMainCategory,
+                normalizedBaseFood
+        ));
+        stageLogs.add("main_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
+
+        if (candidates.size() < MIN_FILTERED_CANDIDATE_POOL) {
+            int beforeContains = candidates.size();
+            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedMainCategoryAndNormalizedSubCategoryContains(
+                    normalizedMainCategory,
+                    normalizedBaseFood,
+                    PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
+            ));
+            stageLogs.add("main_sub_contains +" + (candidates.size() - beforeContains) + " => " + candidates.size());
+        }
+    }
+
+    private void collectKeywordCandidates(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String normalizedMainCategory,
+            String normalizedRecognizedName,
+            List<String> normalizedSearchTerms,
+            String normalizedBaseFood
+    ) {
+        if (StringUtils.hasText(normalizedMainCategory)) {
+            addMainKeywordSearchResults(candidates, stageLogs, "main_keyword_recognized", normalizedMainCategory, List.of(normalizedRecognizedName));
+            if (candidates.size() < MIN_FILTERED_CANDIDATE_POOL) {
+                addMainKeywordSearchResults(candidates, stageLogs, "main_keyword_search_terms", normalizedMainCategory, normalizedSearchTerms);
             }
         }
 
-        return normalized;
+        if (candidates.isEmpty()) {
+            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_recognized", List.of(normalizedRecognizedName));
+            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_search_terms", normalizedSearchTerms);
+        }
+
+        if (candidates.isEmpty() && StringUtils.hasText(normalizedBaseFood)) {
+            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_base_food", List.of(normalizedBaseFood));
+        }
     }
 
-    private void addKeywordSearchResults(Set<Food> candidates, List<String> stageLogs, String stage, Collection<String> baseKeywords) {
-        LinkedHashSet<String> keywords = new LinkedHashSet<>();
-        for (String keyword : baseKeywords) {
-            addKeywordVariants(keywords, keyword);
+    private void addMainKeywordSearchResults(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String stage,
+            String normalizedMainCategory,
+            Collection<String> keywords
+    ) {
+        List<String> normalizedKeywords = compactKeywords(keywords);
+        if (normalizedKeywords.isEmpty()) {
+            return;
         }
 
         int before = candidates.size();
-        for (String keyword : keywords) {
-            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(keyword, PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)));
+        for (String keyword : normalizedKeywords) {
+            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedMainCategoryAndNormalizedKeyword(
+                    normalizedMainCategory,
+                    keyword,
+                    PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
+            ));
         }
-        stageLogs.add(stage + " keywords=" + keywords + " +" + (candidates.size() - before) + " => " + candidates.size());
+        stageLogs.add(stage + " keywords=" + normalizedKeywords + " +" + (candidates.size() - before) + " => " + candidates.size());
     }
 
-    private void addKeywordVariants(Set<String> keywords, String value) {
-        if (!StringUtils.hasText(value)) {
+    private void addGlobalKeywordSearchResults(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String stage,
+            Collection<String> keywords
+    ) {
+        List<String> normalizedKeywords = compactKeywords(keywords);
+        if (normalizedKeywords.isEmpty()) {
             return;
         }
-        keywords.add(value);
-        if (value.length() >= 2) {
-            keywords.add(value.substring(0, Math.min(4, value.length())));
+
+        int before = candidates.size();
+        for (String keyword : normalizedKeywords) {
+            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(
+                    keyword,
+                    PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
+            ));
         }
+        stageLogs.add(stage + " keywords=" + normalizedKeywords + " +" + (candidates.size() - before) + " => " + candidates.size());
     }
 
-    private List<String> normalizeModifiers(String baseFood, Collection<String> modifiers) {
-        if (modifiers == null || modifiers.isEmpty()) {
+    private List<String> compactKeywords(Collection<String> keywords) {
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        if (keywords == null) {
+            return List.of();
+        }
+        for (String keyword : keywords) {
+            if (StringUtils.hasText(keyword)) {
+                normalized.add(keyword);
+            }
+        }
+        return normalized.stream().toList();
+    }
+
+    private List<Food> filterFoodNameExact(Collection<Food> foods, String normalizedRecognizedName) {
+        if (!StringUtils.hasText(normalizedRecognizedName)) {
+            return List.of();
+        }
+        return foods.stream()
+                .filter(food -> normalizedRecognizedName.equals(normalizeKey(food.getFoodName())))
+                .toList();
+    }
+
+    private List<Food> filterCanonicalExact(Collection<Food> foods, String normalizedRecognizedName) {
+        if (!StringUtils.hasText(normalizedRecognizedName)) {
+            return List.of();
+        }
+        return foods.stream()
+                .filter(food -> normalizedRecognizedName.equals(normalizeKey(food.getCanonicalName()))
+                        || normalizedRecognizedName.equals(normalizeKey(extractSuffix(food))))
+                .toList();
+    }
+
+    private List<Food> filterSearchTermExact(Collection<Food> foods, List<String> normalizedSearchTerms) {
+        if (normalizedSearchTerms == null || normalizedSearchTerms.isEmpty()) {
             return List.of();
         }
 
-        String normalizedBaseFood = normalizeBaseFood(baseFood);
-        LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
-
-        for (String modifier : modifiers) {
-            String sanitizedModifier = sanitizeModifier(modifier);
-            if (!StringUtils.hasText(sanitizedModifier)) {
-                continue;
-            }
-
-            addNormalizedModifier(normalizedValues, sanitizedModifier);
-
-            String reducedModifier = stripBaseFoodFromModifier(sanitizedModifier, normalizedBaseFood);
-            if (StringUtils.hasText(reducedModifier) && !reducedModifier.equals(sanitizedModifier)) {
-                addNormalizedModifier(normalizedValues, reducedModifier);
-            }
-
-            for (String token : tokenizeModifier(sanitizedModifier, normalizedBaseFood)) {
-                addNormalizedModifier(normalizedValues, token);
-            }
-        }
-
-        return normalizedValues.stream().toList();
+        return foods.stream()
+                .filter(food -> {
+                    String normalizedFoodName = normalizeKey(food.getFoodName());
+                    String normalizedCanonicalName = normalizeKey(food.getCanonicalName());
+                    String normalizedSuffix = normalizeKey(extractSuffix(food));
+                    return normalizedSearchTerms.stream().anyMatch(term ->
+                            term.equals(normalizedFoodName)
+                                    || term.equals(normalizedCanonicalName)
+                                    || term.equals(normalizedSuffix));
+                })
+                .toList();
     }
 
-    private void addNormalizedModifier(Set<String> normalizedValues, String value) {
-        String normalized = normalizeText(value);
-        if (StringUtils.hasText(normalized)) {
-            normalizedValues.add(normalized);
-        }
+    private List<MatchResult> rankSubset(
+            Collection<Food> foods,
+            String normalizedMainCategory,
+            String normalizedBaseFood,
+            String normalizedRecognizedName,
+            List<String> normalizedModifiers,
+            List<String> normalizedSearchTerms,
+            int limit
+    ) {
+        return foods.stream()
+                .map(food -> score(
+                        food,
+                        normalizedMainCategory,
+                        normalizedBaseFood,
+                        normalizedRecognizedName,
+                        normalizedModifiers,
+                        normalizedSearchTerms
+                ))
+                .filter(result -> result.score() > 0)
+                .sorted(Comparator.comparingInt(MatchResult::score).reversed()
+                        .thenComparing(result -> result.food().getId()))
+                .limit(limit)
+                .toList();
     }
 
-    private MatchResult score(Food food, String normalizedMainCategory, String normalizedBaseFood, List<String> normalizedModifiers) {
+    private MatchResult score(
+            Food food,
+            String normalizedMainCategory,
+            String normalizedBaseFood,
+            String normalizedRecognizedName,
+            List<String> normalizedModifiers,
+            List<String> normalizedSearchTerms
+    ) {
         int score = 0;
         List<String> reasons = new ArrayList<>();
 
-        String normalizedSubCategory = normalizeBaseFood(food.getSubCategory());
-        String normalizedDetailCategory = normalizeText(food.getDetailCategory());
-        String normalizedFoodName = normalizeText(food.getFoodName());
-        String normalizedSuffix = normalizeText(extractSuffix(food));
-        String normalizedMain = normalizeText(food.getMainCategory());
+        String normalizedFoodName = normalizeKey(food.getFoodName());
+        String normalizedCanonicalName = normalizeKey(food.getCanonicalName());
+        String normalizedSubCategory = normalizeKey(food.getSubCategory());
+        String normalizedDetailCategory = normalizeKey(food.getDetailCategory());
+        String normalizedSuffix = normalizeKey(extractSuffix(food));
+        String normalizedMain = normalizeKey(food.getMainCategory());
 
-        if (normalizedBaseFood.equals(normalizedSubCategory)) {
-            score += 70;
-            reasons.add("sub_category_exact");
-        } else if (StringUtils.hasText(normalizedSubCategory) && normalizedSubCategory.contains(normalizedBaseFood)) {
-            score += 40;
-            reasons.add("sub_category_contains");
-        } else if (StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(normalizedBaseFood)) {
-            score += 20;
-            reasons.add("food_name_contains_base");
+        if (StringUtils.hasText(normalizedRecognizedName)) {
+            if (normalizedRecognizedName.equals(normalizedFoodName)) {
+                score += RECOGNIZED_FOOD_NAME_EXACT_SCORE;
+                reasons.add("recognized_name_food_exact");
+            } else if (normalizedRecognizedName.equals(normalizedCanonicalName)) {
+                score += RECOGNIZED_CANONICAL_EXACT_SCORE;
+                reasons.add("recognized_name_canonical_exact");
+            } else if (normalizedRecognizedName.equals(normalizedSuffix)) {
+                score += RECOGNIZED_SUFFIX_EXACT_SCORE;
+                reasons.add("recognized_name_suffix_exact");
+            } else if (StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(normalizedRecognizedName)) {
+                score += RECOGNIZED_FOOD_NAME_CONTAINS_SCORE;
+                reasons.add("recognized_name_food_contains");
+            } else if (StringUtils.hasText(normalizedCanonicalName) && normalizedCanonicalName.contains(normalizedRecognizedName)) {
+                score += RECOGNIZED_CANONICAL_CONTAINS_SCORE;
+                reasons.add("recognized_name_canonical_contains");
+            } else if (StringUtils.hasText(normalizedSuffix) && normalizedSuffix.contains(normalizedRecognizedName)) {
+                score += RECOGNIZED_SUFFIX_CONTAINS_SCORE;
+                reasons.add("recognized_name_suffix_contains");
+            }
+        }
+
+        for (String searchTerm : normalizedSearchTerms) {
+            if (searchTerm.equals(normalizedFoodName) || searchTerm.equals(normalizedCanonicalName) || searchTerm.equals(normalizedSuffix)) {
+                score += SEARCH_TERM_EXACT_SCORE;
+                reasons.add("search_term_exact:" + searchTerm);
+                continue;
+            }
+
+            if ((StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(searchTerm))
+                    || (StringUtils.hasText(normalizedCanonicalName) && normalizedCanonicalName.contains(searchTerm))
+                    || (StringUtils.hasText(normalizedSuffix) && normalizedSuffix.contains(searchTerm))) {
+                score += SEARCH_TERM_CONTAINS_SCORE;
+                reasons.add("search_term_contains:" + searchTerm);
+            }
+        }
+
+        if (StringUtils.hasText(normalizedBaseFood)) {
+            if (normalizedBaseFood.equals(normalizedSubCategory)) {
+                score += BASE_FOOD_SUB_EXACT_SCORE;
+                reasons.add("base_food_sub_exact");
+            } else if (StringUtils.hasText(normalizedSubCategory) && normalizedSubCategory.contains(normalizedBaseFood)) {
+                score += BASE_FOOD_SUB_CONTAINS_SCORE;
+                reasons.add("base_food_sub_contains");
+            } else if (StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(normalizedBaseFood)) {
+                score += BASE_FOOD_FOOD_NAME_CONTAINS_SCORE;
+                reasons.add("base_food_food_name_contains");
+            }
         }
 
         for (String modifier : normalizedModifiers) {
             if (modifier.equals(normalizedDetailCategory)) {
-                score += 30;
-                reasons.add("detail_category_exact:" + modifier);
-            } else if (StringUtils.hasText(normalizedDetailCategory) && normalizedDetailCategory.contains(modifier)) {
-                score += 20;
-                reasons.add("detail_category_contains:" + modifier);
-            }
-
-            if (StringUtils.hasText(normalizedSuffix) && normalizedSuffix.contains(modifier)) {
-                score += 25;
-                reasons.add("suffix_match:" + modifier);
+                score += MODIFIER_DETAIL_EXACT_SCORE;
+                reasons.add("modifier_detail_exact:" + modifier);
+            } else if (StringUtils.hasText(normalizedSuffix) && normalizedSuffix.contains(modifier)) {
+                score += MODIFIER_SUFFIX_CONTAINS_SCORE;
+                reasons.add("modifier_suffix_contains:" + modifier);
             } else if (StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(modifier)) {
-                score += 12;
-                reasons.add("food_name_modifier_match:" + modifier);
+                score += MODIFIER_FOOD_NAME_CONTAINS_SCORE;
+                reasons.add("modifier_food_name_contains:" + modifier);
             }
         }
 
@@ -289,7 +456,7 @@ public class FoodMatchService {
             return new MatchResult(food, 0, "no_match");
         }
 
-        score -= levenshteinPenalty(normalizedBaseFood, normalizedSubCategory);
+        score -= levenshteinPenalty(normalizedRecognizedName, normalizedCanonicalName);
         return new MatchResult(food, score, String.join(",", reasons));
     }
 
@@ -298,7 +465,7 @@ public class FoodMatchService {
             return 0;
         }
         int distance = levenshtein(source, target);
-        return Math.min(distance * 3, 30);
+        return Math.min(distance * 2, 20);
     }
 
     private int levenshtein(String source, String target) {
@@ -325,10 +492,12 @@ public class FoodMatchService {
         if (!StringUtils.hasText(food.getFoodName()) || !StringUtils.hasText(food.getSubCategory())) {
             return food.getFoodName();
         }
+
         int underscore = food.getFoodName().indexOf('_');
         if (underscore >= 0 && underscore + 1 < food.getFoodName().length()) {
             return food.getFoodName().substring(underscore + 1);
         }
+
         String foodName = food.getFoodName();
         String subCategory = food.getSubCategory();
         int subCategoryIndex = foodName.indexOf(subCategory);
@@ -337,93 +506,51 @@ public class FoodMatchService {
             String suffix = foodName.substring(subCategoryIndex + subCategory.length());
             return (prefix + " " + suffix).trim();
         }
+
         return foodName;
     }
 
-    private String sanitizeModifier(String modifier) {
-        if (!StringUtils.hasText(modifier)) {
-            return null;
+    private List<String> normalizeTerms(Collection<String> values, String excludedNormalizedValue) {
+        LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
+        if (values == null) {
+            return List.of();
         }
 
-        String cleaned = Normalizer.normalize(modifier, Normalizer.Form.NFKC);
-        cleaned = MODIFIER_MEASUREMENT_PATTERN.matcher(cleaned).replaceAll(" ");
-        cleaned = NON_SEARCHABLE_PATTERN.matcher(cleaned).replaceAll(" ");
-        cleaned = collapseWhitespace(cleaned);
-        if (!StringUtils.hasText(cleaned)) {
-            return null;
-        }
-
-        List<String> filteredTerms = new ArrayList<>();
-        for (String term : cleaned.split("\\s+")) {
-            if (!StringUtils.hasText(term)) {
+        for (String value : values) {
+            String normalized = normalizeKey(sanitizeTerm(value));
+            if (!StringUtils.hasText(normalized)) {
                 continue;
             }
-            String lowered = term.toLowerCase(Locale.ROOT);
-            if (MODIFIER_NOISE_TERMS.contains(lowered)) {
+            if (StringUtils.hasText(excludedNormalizedValue) && excludedNormalizedValue.equals(normalized)) {
                 continue;
             }
-            filteredTerms.add(term);
+            normalizedValues.add(normalized);
         }
 
-        return collapseWhitespace(String.join(" ", filteredTerms));
+        return normalizedValues.stream().toList();
     }
 
-    private String stripBaseFoodFromModifier(String modifier, String normalizedBaseFood) {
-        if (!StringUtils.hasText(modifier) || !StringUtils.hasText(normalizedBaseFood)) {
-            return modifier;
-        }
-
-        String normalizedModifier = normalizeText(modifier);
-        if (!StringUtils.hasText(normalizedModifier) || !normalizedModifier.contains(normalizedBaseFood)) {
-            return modifier;
-        }
-
-        String stripped = normalizedModifier.replace(normalizedBaseFood, "");
-        return stripped.length() >= 2 ? stripped : modifier;
-    }
-
-    private List<String> tokenizeModifier(String modifier, String normalizedBaseFood) {
-        LinkedHashSet<String> tokens = new LinkedHashSet<>();
-        for (String token : MODIFIER_SPLIT_PATTERN.split(modifier)) {
-            String normalizedToken = normalizeText(token);
-            if (!StringUtils.hasText(normalizedToken)) {
-                continue;
-            }
-            if (normalizedToken.length() < 2) {
-                continue;
-            }
-            if (normalizedToken.equals(normalizedBaseFood)) {
-                continue;
-            }
-            tokens.add(normalizedToken);
-        }
-        return tokens.stream().toList();
-    }
-
-    private String collapseWhitespace(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.replaceAll("\\s+", " ").trim();
-    }
-
-    private String normalizeText(String value) {
+    private String sanitizeTerm(String value) {
         if (!StringUtils.hasText(value)) {
             return null;
         }
 
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC);
-        for (Map.Entry<String, String> entry : TEXT_SYNONYM_REPLACEMENTS.entrySet()) {
-            normalized = normalized.replace(entry.getKey(), entry.getValue());
+        normalized = MEASUREMENT_PATTERN.matcher(normalized).replaceAll(" ");
+        normalized = MULTI_SPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
+        return StringUtils.hasText(normalized) ? normalized : null;
+    }
+
+    private String normalizeKey(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
         }
 
-        normalized = normalized
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC)
                 .replace('_', ' ')
-                .replaceAll("[^0-9a-zA-Z가-힣/\\s]", " ")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", "")
-                .trim();
-
+                .toLowerCase(Locale.ROOT);
+        normalized = MULTI_SPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
+        normalized = normalized.replace(" ", "");
         return StringUtils.hasText(normalized) ? normalized : null;
     }
 

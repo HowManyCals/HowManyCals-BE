@@ -36,7 +36,7 @@ public class SecurityConfig {
                         // 이때 별도 스레드라 SecurityContext가 비어있어 AccessDenied가 발생하므로,
                         // ASYNC/FORWARD/ERROR dispatch는 무조건 통과시킨다.
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/auth/refresh", "/status", "/h2-console/**", "/api/ai/callback", "/error").permitAll()
+                        .requestMatchers("/user/signup", "/user/signin", "/auth/oauth/**", "/auth/refresh", "/status", "/h2-console/**", "/api/ai/callback", "/error", "/debug/food/**").permitAll()
                     .anyRequest().authenticated()
             )
             // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 등록

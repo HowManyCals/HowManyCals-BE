@@ -7,6 +7,7 @@ import ksu.finalproject.domain.analysis.service.AnalysisSseService;
 import ksu.finalproject.domain.analysis.service.FoodAnalysisResultProcessorService;
 import ksu.finalproject.domain.analysis.service.FoodImageFileService;
 import ksu.finalproject.domain.analysis.dto.FoodAnalyzeResponseDto;
+import ksu.finalproject.domain.analysis.dto.FoodAnalyzeCandidateDto;
 import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
 import ksu.finalproject.domain.food.entity.enums.AnalysisStatus;
@@ -85,7 +86,9 @@ public class FoodService {
                     return new CustomException(ResponseCode.NOT_FOUND_FOOD_IMAGE_ANALYSIS);
                 });
 
-        return toResultDto(log);
+        FoodAnalysisResultDto response = toResultDto(log);
+        logFePayload("GET_RESULT", response);
+        return response;
     }
 
     /**
@@ -136,6 +139,7 @@ public class FoodService {
         );
 
         // 구독 중인 FE에 결과 푸시
+        logFePayload("SSE_PUSH", processedResult);
         log.info("AI 콜백 SSE 전송 시도 aiLogId={}", analysisLog.getId());
         analysisSseService.emit(analysisLog.getId(), processedResult);
     }
@@ -156,10 +160,12 @@ public class FoodService {
             FoodService.log.info("분석 결과 SSE 즉시 응답 aiLogId={}, userId={}, status={}", aiLogId, userId, log.getAnalysisStatus());
             SseEmitter emitter = new SseEmitter();
             try {
+                FoodAnalysisResultDto response = toResultDto(log);
+                logFePayload("SSE_IMMEDIATE", response);
                 emitter.send(
                         SseEmitter.event()
                                 .name("analysis-complete")
-                                .data(toResultDto(log), MediaType.APPLICATION_JSON)
+                                .data(response, MediaType.APPLICATION_JSON)
                 );
                 emitter.complete();
             } catch (IOException e) {
@@ -219,6 +225,52 @@ public class FoodService {
                 .inferenceTimeMs(log.getInferenceTimeMs())
                 .aiLogId(log.getId())
                 .build();
+    }
+
+    private void logFePayload(String route, FoodAnalysisResultDto response) {
+        if (response == null) {
+            log.info("FE 응답 payload route={}, aiLogId=null, analysisStatus=null, candidateCount=0, candidates=none", route);
+            return;
+        }
+
+        int candidateCount = response.getCandidates() != null ? response.getCandidates().size() : 0;
+        log.info("FE 응답 payload route={}, aiLogId={}, analysisStatus={}, candidateCount={}, candidates={}",
+                route,
+                response.getAiLogId(),
+                response.getAnalysisStatus(),
+                candidateCount,
+                summarizeResponseCandidates(response));
+    }
+
+    private String summarizeResponseCandidates(FoodAnalysisResultDto response) {
+        if (response == null || response.getCandidates() == null || response.getCandidates().isEmpty()) {
+            return "none";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int limit = Math.min(response.getCandidates().size(), 5);
+        for (int i = 0; i < limit; i++) {
+            FoodAnalyzeCandidateDto candidate = response.getCandidates().get(i);
+            if (i > 0) {
+                builder.append(" | ");
+            }
+            builder.append("{foodId=")
+                    .append(candidate.getFoodId())
+                    .append(",foodName=")
+                    .append(candidate.getFoodName())
+                    .append(",recognizedName=")
+                    .append(candidate.getRecognizedName())
+                    .append(",matchedFoodName=")
+                    .append(candidate.getMatchedFoodName())
+                    .append(",servingKcal=")
+                    .append(candidate.getServingKcal())
+                    .append(",servingUnitLabel=")
+                    .append(candidate.getServingUnitLabel())
+                    .append(",dataSource=")
+                    .append(candidate.getDataSource())
+                    .append("}");
+        }
+        return builder.toString();
     }
 
     private String toJson(Object value) throws CustomException {

@@ -21,6 +21,12 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("confidence_score")
     private Double confidenceScore;
 
+    @JsonProperty("recognized_name")
+    private String recognizedName;
+
+    @JsonProperty("matched_food_name")
+    private String matchedFoodName;
+
     @JsonProperty("food_name")
     private String foodName;
 
@@ -36,10 +42,9 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("fat")
     private Double fat;
 
-    @JsonProperty("serving_unit_label") // 900g, 200ml 이런 식으로 내려줌
+    @JsonProperty("serving_unit_label")
     private String servingUnitLabel;
 
     @JsonProperty("data_source")
     private DataSource dataSource;
 }
-

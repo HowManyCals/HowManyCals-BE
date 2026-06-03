@@ -31,6 +31,7 @@ public class FoodAnalysisResultProcessorService {
     private static final int AMBIGUOUS_RESPONSE_LIMIT = 3;
     private static final int AUTO_CONFIRM_SCORE_THRESHOLD = 85;
     private static final int AUTO_CONFIRM_GAP_THRESHOLD = 15;
+    private static final int WEAK_MATCH_UNMATCHED_SCORE_THRESHOLD = 25;
 
     private final FoodMatchService foodMatchService;
     private final LlmService llmService;
@@ -70,7 +71,9 @@ public class FoodAnalysisResultProcessorService {
         List<FoodMatchService.MatchResult> matches = foodMatchService.matchFoods(
                 null,
                 candidate.getFoodName(),
+                candidate.getFoodName(),
                 List.of(),
+                List.of(candidate.getFoodName()),
                 TOP_CANDIDATE_LIMIT
         );
         if (matches.isEmpty()) {
@@ -78,7 +81,44 @@ public class FoodAnalysisResultProcessorService {
             return List.of(buildUnmatchedCandidate(aiLogId, candidate, null, "AI_DIRECT_NO_MATCH"));
         }
 
-        return selectResponseCandidates(aiLogId, candidate, matches, "AI_DIRECT");
+        return selectResponseCandidates(aiLogId, candidate, null, matches, "AI_DIRECT");
+    }
+
+    public List<FoodAnalyzeCandidateDto> processDebugLlmBranch(
+            Long aiLogId,
+            Double confidenceScore,
+            LlmFoodAnalysisResponseDto llmResponse
+    ) {
+        if (llmResponse == null || (!StringUtils.hasText(llmResponse.getRecognizedName()) && !StringUtils.hasText(llmResponse.getBaseFood()))) {
+            return List.of();
+        }
+
+        AiAnalysisCandidateDto candidate = AiAnalysisCandidateDto.builder()
+                .aiModelIndex(0)
+                .confidenceScore(confidenceScore)
+                .foodName(StringUtils.hasText(llmResponse.getRecognizedName()) ? llmResponse.getRecognizedName() : llmResponse.getBaseFood())
+                .build();
+
+        List<FoodMatchService.MatchResult> matches = foodMatchService.matchFoods(
+                llmResponse.getMainCategory(),
+                llmResponse.getBaseFood(),
+                llmResponse.getRecognizedName(),
+                llmResponse.getModifiers(),
+                llmResponse.getSearchTerms(),
+                TOP_CANDIDATE_LIMIT
+        );
+        if (matches.isEmpty()) {
+            return List.of(FoodAnalyzeCandidateDto.builder()
+                    .aiModelIndex(candidate.getAiModelIndex())
+                    .confidenceScore(candidate.getConfidenceScore())
+                    .recognizedName(candidate.getFoodName())
+                    .matchedFoodName(null)
+                    .foodName(UNMATCHED_FOOD_NAME)
+                    .dataSource(DataSource.UNMATCHED)
+                    .build());
+        }
+
+        return selectResponseCandidates(aiLogId, candidate, llmResponse, matches, "DEBUG_LLM_BRANCH");
     }
 
     private List<FoodAnalyzeCandidateDto> processWithLlmBranch(Long aiLogId, AiAnalysisCandidateDto candidate) {
@@ -95,43 +135,50 @@ public class FoodAnalysisResultProcessorService {
                         .build()
         );
 
-        if (llmResponse == null || !StringUtils.hasText(llmResponse.getBaseFood())) {
+        if (llmResponse == null || (!StringUtils.hasText(llmResponse.getRecognizedName()) && !StringUtils.hasText(llmResponse.getBaseFood()))) {
             log.warn("LLM branch 실패 - 구조화 응답 없음 aiLogId={}, foodName={}", aiLogId, candidate.getFoodName());
             return List.of(buildUnmatchedCandidate(aiLogId, candidate, null, "LLM_RESPONSE_EMPTY"));
         }
 
-        log.info("LLM branch 응답 aiLogId={}, mainCategory={}, baseFood={}, modifiers={}",
+        log.info("LLM branch 응답 aiLogId={}, recognizedName={}, mainCategory={}, baseFood={}, modifiers={}, searchTerms={}",
                 aiLogId,
+                llmResponse.getRecognizedName(),
                 llmResponse.getMainCategory(),
                 llmResponse.getBaseFood(),
-                llmResponse.getModifiers());
+                llmResponse.getModifiers(),
+                llmResponse.getSearchTerms());
 
         List<FoodMatchService.MatchResult> matches = foodMatchService.matchFoods(
                 llmResponse.getMainCategory(),
                 llmResponse.getBaseFood(),
+                llmResponse.getRecognizedName(),
                 llmResponse.getModifiers(),
+                llmResponse.getSearchTerms(),
                 TOP_CANDIDATE_LIMIT
         );
         if (matches.isEmpty()) {
-            log.warn("LLM branch food 매칭 실패 aiLogId={}, baseFood={}, modifiers={}",
+            log.warn("LLM branch food 매칭 실패 aiLogId={}, recognizedName={}, baseFood={}, modifiers={}, searchTerms={}",
                     aiLogId,
+                    llmResponse.getRecognizedName(),
                     llmResponse.getBaseFood(),
-                    llmResponse.getModifiers());
+                    llmResponse.getModifiers(),
+                    llmResponse.getSearchTerms());
             return List.of(buildUnmatchedCandidate(aiLogId, candidate, llmResponse, "LLM_BRANCH_NO_MATCH"));
         }
 
         AiAnalysisCandidateDto llmCandidate = AiAnalysisCandidateDto.builder()
                 .aiModelIndex(candidate.getAiModelIndex())
                 .confidenceScore(candidate.getConfidenceScore())
-                .foodName(llmResponse.getBaseFood())
+                .foodName(StringUtils.hasText(llmResponse.getRecognizedName()) ? llmResponse.getRecognizedName() : llmResponse.getBaseFood())
                 .servingUnitLabel(candidate.getServingUnitLabel())
                 .build();
-        return selectResponseCandidates(aiLogId, llmCandidate, matches, "LLM_BRANCH");
+        return selectResponseCandidates(aiLogId, llmCandidate, llmResponse, matches, "LLM_BRANCH");
     }
 
     private List<FoodAnalyzeCandidateDto> selectResponseCandidates(
             Long aiLogId,
             AiAnalysisCandidateDto candidate,
+            LlmFoodAnalysisResponseDto llmResponse,
             List<FoodMatchService.MatchResult> matches,
             String branch
     ) {
@@ -144,7 +191,7 @@ public class FoodAnalysisResultProcessorService {
         List<FoodMatchService.MatchResult> distinctMatches = deduplicateMatches(branch, aiLogId, matches);
         if (distinctMatches.isEmpty()) {
             log.warn("{} 중복 제거 후 후보가 비었습니다. aiLogId={}", branch, aiLogId);
-            return List.of(buildUnmatchedCandidate(aiLogId, candidate, null, branch + "_DEDUP_EMPTY"));
+            return List.of(buildUnmatchedCandidate(aiLogId, candidate, llmResponse, branch + "_DEDUP_EMPTY"));
         }
 
         FoodMatchService.MatchResult top1 = distinctMatches.get(0);
@@ -166,33 +213,109 @@ public class FoodAnalysisResultProcessorService {
                 gap,
                 distinctMatches.size());
 
-        if (top1.score() >= AUTO_CONFIRM_SCORE_THRESHOLD && gap >= AUTO_CONFIRM_GAP_THRESHOLD) {
-            log.info("{} 자동 확정 aiLogId={}, foodId={}, score={}, reason={}",
+        if (shouldTreatAsUnmatched(top1)) {
+            log.warn("{} 약한 후보만 존재 - UNMATCHED aiLogId={}, top1FoodId={}, top1Score={}, top1Reason={}, distinctCandidateCount={}",
                     branch,
                     aiLogId,
                     top1.food().getId(),
                     top1.score(),
-                    top1.reason());
-            return List.of(buildMatchedCandidate(candidate, top1.food(), DataSource.DB_EXACT));
+                    top1.reason(),
+                    distinctMatches.size());
+            return List.of(buildUnmatchedCandidate(aiLogId, candidate, llmResponse, branch + "_WEAK_MATCH"));
+        }
+
+        if (canAutoConfirm(top1, gap)) {
+            DataSource source = resolveDataSource(top1);
+            log.info("{} 자동 확정 aiLogId={}, foodId={}, score={}, reason={}, dataSource={}",
+                    branch,
+                    aiLogId,
+                    top1.food().getId(),
+                    top1.score(),
+                    top1.reason(),
+                    source);
+            return buildMatchedResponse(branch, aiLogId, "AUTO_CONFIRM", candidate, List.of(top1));
         }
 
         if (distinctMatches.size() == 1) {
-            log.info("{} 단일 distinct 후보 반환 aiLogId={}, foodId={}, score={}, reason={}",
+            if (!hasStrongMatchReason(top1.reason())) {
+                log.warn("{} 단일 distinct지만 strong match 없음 - UNMATCHED aiLogId={}, top1FoodId={}, top1Score={}, top1Reason={}",
+                        branch,
+                        aiLogId,
+                        top1.food().getId(),
+                        top1.score(),
+                        top1.reason());
+                return List.of(buildUnmatchedCandidate(aiLogId, candidate, llmResponse, branch + "_SINGLE_DISTINCT_WEAK"));
+            }
+
+            DataSource source = resolveDataSource(top1);
+            log.info("{} 단일 distinct 후보 반환 aiLogId={}, foodId={}, score={}, reason={}, dataSource={}",
                     branch,
                     aiLogId,
                     top1.food().getId(),
                     top1.score(),
-                    top1.reason());
-            return List.of(buildMatchedCandidate(candidate, top1.food(), DataSource.DB_FUZZY));
+                    top1.reason(),
+                    source);
+            return buildMatchedResponse(branch, aiLogId, "SINGLE_DISTINCT", candidate, List.of(top1));
         }
 
-        List<FoodAnalyzeCandidateDto> ambiguousCandidates = distinctMatches.stream()
+        List<FoodMatchService.MatchResult> selectedMatches = distinctMatches.stream()
                 .limit(AMBIGUOUS_RESPONSE_LIMIT)
-                .map(match -> buildMatchedCandidate(candidate, match.food(), DataSource.DB_FUZZY))
                 .toList();
 
-        log.info("{} 다중 후보 반환 aiLogId={}, candidateCount={}", branch, aiLogId, ambiguousCandidates.size());
-        return ambiguousCandidates;
+        log.info("{} 다중 후보 반환 aiLogId={}, candidateCount={}", branch, aiLogId, selectedMatches.size());
+        return buildMatchedResponse(branch, aiLogId, "AMBIGUOUS_TOP" + selectedMatches.size(), candidate, selectedMatches);
+    }
+
+    private DataSource resolveDataSource(FoodMatchService.MatchResult match) {
+        String reason = match.reason();
+        if (reason.contains("recognized_name_food_exact")
+                || reason.contains("recognized_name_canonical_exact")
+                || reason.contains("recognized_name_suffix_exact")) {
+            return DataSource.DB_EXACT;
+        }
+        return DataSource.DB_FUZZY;
+    }
+
+    private boolean shouldTreatAsUnmatched(FoodMatchService.MatchResult topMatch) {
+        if (topMatch == null) {
+            return true;
+        }
+
+        boolean strongMatch = hasStrongMatchReason(topMatch.reason());
+        if (topMatch.score() < WEAK_MATCH_UNMATCHED_SCORE_THRESHOLD && !strongMatch) {
+            return true;
+        }
+
+        return !strongMatch && topMatch.reason() != null && topMatch.reason().contains("main_category_mismatch");
+    }
+
+    private boolean hasStrongMatchReason(String reason) {
+        if (!StringUtils.hasText(reason)) {
+            return false;
+        }
+
+        return reason.contains("recognized_name_food_exact")
+                || reason.contains("recognized_name_canonical_exact")
+                || reason.contains("recognized_name_suffix_exact")
+                || reason.contains("search_term_exact")
+                || reason.contains("base_food_sub_exact")
+                || reason.contains("modifier_detail_exact");
+    }
+
+    private boolean canAutoConfirm(FoodMatchService.MatchResult topMatch, int gap) {
+        if (topMatch == null) {
+            return false;
+        }
+
+        if (topMatch.score() < AUTO_CONFIRM_SCORE_THRESHOLD || gap < AUTO_CONFIRM_GAP_THRESHOLD) {
+            return false;
+        }
+
+        if (!hasStrongMatchReason(topMatch.reason())) {
+            return false;
+        }
+
+        return topMatch.reason() == null || !topMatch.reason().contains("main_category_mismatch");
     }
 
     private List<FoodMatchService.MatchResult> deduplicateMatches(
@@ -205,7 +328,7 @@ public class FoodAnalysisResultProcessorService {
 
         for (FoodMatchService.MatchResult match : matches) {
             String displayName = match.food().getDisplayName();
-            String dedupeKey = foodMatchService.normalizeAndApplySynonyms(displayName);
+            String dedupeKey = resolveDedupeKey(match);
             if (!StringUtils.hasText(dedupeKey)) {
                 dedupeKey = "food-id-" + match.food().getId();
             }
@@ -238,6 +361,22 @@ public class FoodAnalysisResultProcessorService {
         return new ArrayList<>(bestByDisplayName.values());
     }
 
+    private String resolveDedupeKey(FoodMatchService.MatchResult match) {
+        if (match == null || match.food() == null) {
+            return null;
+        }
+
+        if (hasStrongMatchReason(match.reason())) {
+            return foodMatchService.normalizeAndApplySynonyms(match.food().getDisplayName());
+        }
+
+        String foodNameKey = foodMatchService.normalizeAndApplySynonyms(match.food().getFoodName());
+        if (StringUtils.hasText(foodNameKey)) {
+            return foodNameKey;
+        }
+        return foodMatchService.normalizeAndApplySynonyms(match.food().getDisplayName());
+    }
+
     private String summarizeMatches(List<FoodMatchService.MatchResult> matches) {
         return matches.stream()
                 .limit(5)
@@ -253,6 +392,80 @@ public class FoodAnalysisResultProcessorService {
                 .orElse("none");
     }
 
+    private List<FoodAnalyzeCandidateDto> buildMatchedResponse(
+            String branch,
+            Long aiLogId,
+            String selectionType,
+            AiAnalysisCandidateDto candidate,
+            List<FoodMatchService.MatchResult> selectedMatches
+    ) {
+        List<FoodAnalyzeCandidateDto> responseCandidates = selectedMatches.stream()
+                .map(match -> buildMatchedCandidate(candidate, match.food(), resolveDataSource(match)))
+                .toList();
+        logDbMappingResult(branch, aiLogId, selectionType, candidate, selectedMatches, responseCandidates);
+        return responseCandidates;
+    }
+
+    private void logDbMappingResult(
+            String branch,
+            Long aiLogId,
+            String selectionType,
+            AiAnalysisCandidateDto candidate,
+            List<FoodMatchService.MatchResult> selectedMatches,
+            List<FoodAnalyzeCandidateDto> responseCandidates
+    ) {
+        log.info("{} DB 매핑 결과 aiLogId={}, selectionType={}, recognizedName={}, mappedCount={}, mapped={}",
+                branch,
+                aiLogId,
+                selectionType,
+                candidate != null ? candidate.getFoodName() : null,
+                selectedMatches != null ? selectedMatches.size() : 0,
+                summarizeMappedResults(selectedMatches, responseCandidates));
+    }
+
+    private String summarizeMappedResults(
+            List<FoodMatchService.MatchResult> matches,
+            List<FoodAnalyzeCandidateDto> responseCandidates
+    ) {
+        if (matches == null || matches.isEmpty()) {
+            return "none";
+        }
+
+        List<String> summaries = new ArrayList<>();
+        int size = Math.min(matches.size(), responseCandidates != null ? responseCandidates.size() : 0);
+        for (int i = 0; i < size; i++) {
+            FoodMatchService.MatchResult match = matches.get(i);
+            FoodAnalyzeCandidateDto responseCandidate = responseCandidates.get(i);
+            Food food = match.food();
+            summaries.add("{foodId="
+                    + food.getId()
+                    + ",responseFoodName="
+                    + responseCandidate.getFoodName()
+                    + ",recognizedName="
+                    + responseCandidate.getRecognizedName()
+                    + ",matchedFoodName="
+                    + responseCandidate.getMatchedFoodName()
+                    + ",dbFoodName="
+                    + food.getFoodName()
+                    + ",mainCategory="
+                    + food.getMainCategory()
+                    + ",subCategory="
+                    + food.getSubCategory()
+                    + ",detailCategory="
+                    + food.getDetailCategory()
+                    + ",servingKcal="
+                    + food.getServingKcal()
+                    + ",dataSource="
+                    + responseCandidate.getDataSource()
+                    + ",score="
+                    + match.score()
+                    + ",reason="
+                    + match.reason()
+                    + "}");
+        }
+        return String.join(" | ", summaries);
+    }
+
     private FoodAnalysisResultDto toResponseDto(AiAnalysisCallbackDto result, List<FoodAnalyzeCandidateDto> candidates) {
         return FoodAnalysisResultDto.builder()
                 .analysisStatus(result.getAnalysisStatus())
@@ -265,11 +478,16 @@ public class FoodAnalysisResultProcessorService {
     }
 
     private FoodAnalyzeCandidateDto buildMatchedCandidate(AiAnalysisCandidateDto candidate, Food food, DataSource dataSource) {
-        String responseFoodName = food != null ? food.getDisplayName() : candidate.getFoodName();
+        String recognizedName = candidate != null ? candidate.getFoodName() : null;
+        String matchedFoodName = food != null ? food.getDisplayName() : recognizedName;
+        String responseFoodName = StringUtils.hasText(recognizedName) ? recognizedName : matchedFoodName;
+
         return FoodAnalyzeCandidateDto.builder()
                 .aiModelIndex(candidate.getAiModelIndex())
                 .foodId(food != null ? food.getId() : null)
                 .confidenceScore(candidate.getConfidenceScore())
+                .recognizedName(recognizedName)
+                .matchedFoodName(matchedFoodName)
                 .foodName(responseFoodName)
                 .servingKcal(food != null ? food.getServingKcal() : null)
                 .carbohydrate(food != null ? food.getCarbohydrate() : null)
@@ -286,11 +504,21 @@ public class FoodAnalysisResultProcessorService {
             LlmFoodAnalysisResponseDto llmResponse,
             String failureReason
     ) {
-        log.warn("음식 후보 DB 매칭 실패 candidateFoodName={}, failureReason={}", candidate.getFoodName(), failureReason);
+        log.warn("음식 후보 DB 매칭 실패 aiLogId={}, originalFoodName={}, recognizedName={}, llmMainCategory={}, llmBaseFood={}, llmModifiers={}, llmSearchTerms={}, failureReason={}",
+                aiLogId,
+                candidate != null ? candidate.getFoodName() : null,
+                llmResponse != null && StringUtils.hasText(llmResponse.getRecognizedName()) ? llmResponse.getRecognizedName() : (candidate != null ? candidate.getFoodName() : null),
+                llmResponse != null ? llmResponse.getMainCategory() : null,
+                llmResponse != null ? llmResponse.getBaseFood() : null,
+                llmResponse != null ? llmResponse.getModifiers() : null,
+                llmResponse != null ? llmResponse.getSearchTerms() : null,
+                failureReason);
         saveUnmatchedLog(aiLogId, candidate, llmResponse, failureReason);
         return FoodAnalyzeCandidateDto.builder()
                 .aiModelIndex(candidate.getAiModelIndex())
                 .confidenceScore(candidate.getConfidenceScore())
+                .recognizedName(candidate.getFoodName())
+                .matchedFoodName(null)
                 .foodName(UNMATCHED_FOOD_NAME)
                 .servingUnitLabel(candidate.getServingUnitLabel())
                 .dataSource(DataSource.UNMATCHED)

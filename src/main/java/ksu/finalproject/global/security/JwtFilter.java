@@ -31,7 +31,8 @@ public class JwtFilter extends OncePerRequestFilter {
             "/status",
             "/h2-console/**",
             "/api/ai/callback",
-            "/auth/oauth/**"
+            "/auth/oauth/**",
+            "/debug/food/**"
     );
 
     private final JwtProvider jwtProvider;

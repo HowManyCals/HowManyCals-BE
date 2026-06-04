@@ -37,8 +37,23 @@ public class Food {
     private String detailCategory; // 예 : 바지락
 
     public String getDisplayName(){
-        if (StringUtils.hasText(detailCategory)) return detailCategory + " " + subCategory; // 예 : 바지락 칼국수
-        return subCategory; // 예 : 칼국수
+        if (StringUtils.hasText(detailCategory) && StringUtils.hasText(subCategory)) {
+            return detailCategory + " " + subCategory; // 예 : 바지락 칼국수
+        }
+        if (StringUtils.hasText(foodName) && foodName.equals(subCategory)) {
+            return subCategory; // 예 : 칼국수
+        }
+        if (StringUtils.hasText(foodName)) {
+            int underscore = foodName.indexOf('_');
+            if (underscore >= 0 && underscore + 1 < foodName.length()) {
+                String suffix = foodName.substring(underscore + 1).trim();
+                if (StringUtils.hasText(suffix)) {
+                    return suffix;
+                }
+            }
+            return foodName;
+        }
+        return subCategory; // 예외 데이터 방어용 fallback
     }
 
     public String getCanonicalName() {

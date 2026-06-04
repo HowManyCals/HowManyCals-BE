@@ -111,6 +111,7 @@ public class RecommendationInputService {
 
     private List<DietRecommendationEngine.Food> loadFoods() {
         return foodRepository.findAllByIsActiveTrue().stream()
+                .filter(food -> food.getServingKcal() != null && food.getServingKcal() > 0)
                 .map(this::toRecommendationFood)
                 .toList();
     }
@@ -284,5 +285,6 @@ public class RecommendationInputService {
         return value.doubleValue();
     }
 }
+
 
 

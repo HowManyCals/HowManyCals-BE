@@ -256,8 +256,6 @@ public class FoodService {
             }
             builder.append("{foodId=")
                     .append(candidate.getFoodId())
-                    .append(",foodName=")
-                    .append(candidate.getFoodName())
                     .append(",recognizedName=")
                     .append(candidate.getRecognizedName())
                     .append(",matchedFoodName=")

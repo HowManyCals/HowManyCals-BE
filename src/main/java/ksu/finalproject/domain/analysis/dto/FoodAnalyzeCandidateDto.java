@@ -27,8 +27,6 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("matched_food_name")
     private String matchedFoodName;
 
-    @JsonProperty("food_name")
-    private String foodName;
 
     @JsonProperty("serving_kcal")
     private Double servingKcal;

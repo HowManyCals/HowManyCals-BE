@@ -14,14 +14,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 @RestController
 @RequestMapping("/recommendations")
 @RequiredArgsConstructor
 public class RecommendationController {
-
-    private static final ZoneId ZONE_ID = ZoneId.of("Asia/Seoul");
 
     private final RecommendationQueryService recommendationQueryService;
     private final RecommendationApplicationService recommendationApplicationService;
@@ -39,13 +36,12 @@ public class RecommendationController {
 
     @PostMapping("/daily/generate")
     public CommonResponse<RecommendationJobResponseDto> generateDailyRecommendation(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             Authentication authentication
     ) throws CustomException {
-        LocalDate recommendationDate = date == null ? LocalDate.now(ZONE_ID).plusDays(1) : date;
         RecommendationJobResult result = recommendationApplicationService.generateForUser(
                 Math.toIntExact(extractUserId(authentication)),
-                recommendationDate
+                date
         );
         return new CommonResponse<>(
                 ResponseCode.SUCCESS_GENERATE_DAILY_MEAL_RECOMMENDATION,

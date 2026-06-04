@@ -3,8 +3,10 @@ package ksu.finalproject.global.common;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import tools.jackson.databind.exc.InvalidFormatException;
@@ -61,6 +63,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestPartException.class)
     public CommonResponse<?> handleMissingServletRequestPartException(MissingServletRequestPartException e) {
         return new CommonResponse<>(ResponseCode.EMPTY_FOOD_IMAGE);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public CommonResponse<?> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+        return new CommonResponse<>(ResponseCode.BAD_REQUEST, e.getParameterName() + " 파라미터가 필요해요.");
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public CommonResponse<?> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
+        return new CommonResponse<>(ResponseCode.BAD_REQUEST, e.getName() + " 파라미터 형식이 올바르지 않아요.");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

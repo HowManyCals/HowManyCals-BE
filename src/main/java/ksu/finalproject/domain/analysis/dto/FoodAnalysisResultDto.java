@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class FoodAnalysisResultDto {
@@ -33,4 +33,7 @@ public class FoodAnalysisResultDto {
 
     @JsonProperty("ai_log_id")
     private Long aiLogId;
+
+    @JsonProperty("image_key")
+    private String imageKey;
 }

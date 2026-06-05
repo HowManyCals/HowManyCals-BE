@@ -14,9 +14,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -42,111 +42,139 @@ public class FoodImageFileService {
             throw new CustomException(ResponseCode.FOOD_IMAGE_SIZE_EXCEEDED);
         }
 
-        // 아래 검증 방법들은 완전 검증은 아님.
-        // SIGNATURE 또는 Magic Number 기반으로 파싱하는 게 필요할 수도 있음
-
-        // HTTP 헤더 값 파싱 (image/png) 후 검증
         String contentType = image.getContentType();
         if (!StringUtils.hasText(contentType)
                 || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
-            log.warn("음식 이미지 검증 실패 - 허용되지 않은 contentType={}", contentType);
+            log.warn("음식 이미지 검증 실패 - 지원하지 않는 contentType={}", contentType);
             throw new CustomException(ResponseCode.UNSUPPORTED_FOOD_IMAGE_TYPE);
         }
 
-        // 확장자 검증
         String extension = getExtension(image.getOriginalFilename());
         if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension)) {
-            log.warn("음식 이미지 검증 실패 - 허용되지 않은 확장자 filename={}, extension={}", image.getOriginalFilename(), extension);
+            log.warn("음식 이미지 검증 실패 - 지원하지 않는 확장자 filename={}, extension={}", image.getOriginalFilename(), extension);
             throw new CustomException(ResponseCode.UNSUPPORTED_FOOD_IMAGE_TYPE);
         }
-    }
-
-    private String getExtension(String filename) {
-        String extension = StringUtils.getFilenameExtension(filename);
-        return StringUtils.hasText(extension) ? extension.toLowerCase(Locale.ROOT) : "";
     }
 
     public SavedFoodImage save(Long aiLogId, MultipartFile image) throws CustomException, IOException {
         validate(image);
 
-        Path directory = tempDirectory();
-        Files.createDirectories(directory);
-
-        deleteByAiLogId(aiLogId);
-
-        String extension = canonicalExtension(image);
-        Path path = directory.resolve(aiLogId + "." + extension).toAbsolutePath().normalize();
+        String storageKey = generateStorageKey(image);
+        Path path = resolvePath(storageKey);
+        Files.createDirectories(path.getParent());
         image.transferTo(path.toFile());
 
-        log.info("음식 이미지 임시 저장 완료 aiLogId={}, path={}, contentType={}", aiLogId, path, image.getContentType());
-        return new SavedFoodImage(path, image.getContentType());
+        log.info("음식 이미지 저장 완료 aiLogId={}, storageKey={}, path={}, contentType={}",
+                aiLogId, storageKey, path, image.getContentType());
+        return new SavedFoodImage(storageKey, path, image.getContentType());
     }
 
-    public byte[] readBytes(Long aiLogId) throws IOException {
-        return Files.readAllBytes(requireExistingPath(aiLogId));
+    public LoadedFoodImage load(String storageKey) throws IOException {
+        Path path = requireExistingPath(storageKey);
+        return new LoadedFoodImage(
+                Files.readAllBytes(path),
+                detectContentType(path)
+        );
     }
 
-    public String detectContentType(Long aiLogId) throws IOException {
-        Path normalized = requireExistingPath(aiLogId);
-        try {
-            String detected = Files.probeContentType(normalized);
-            if (StringUtils.hasText(detected)) {
-                return detected;
-            }
-        } catch (IOException e) {
-            log.debug("임시 이미지 contentType 감지 실패 path={}: {}", normalized, e.getMessage());
-        }
-
-        String extension = getExtension(normalized.getFileName() != null ? normalized.getFileName().toString() : null);
-        return switch (extension) {
-            case "png" -> MediaType.IMAGE_PNG_VALUE;
-            case "webp" -> "image/webp";
-            case "jpg", "jpeg" -> MediaType.IMAGE_JPEG_VALUE;
-            default -> MediaType.IMAGE_JPEG_VALUE;
-        };
-    }
-
-    public void deleteByAiLogId(Long aiLogId) {
-        if (aiLogId == null) {
+    public void delete(String storageKey) {
+        if (!StringUtils.hasText(storageKey)) {
             return;
         }
 
-        for (String extension : ALLOWED_EXTENSIONS) {
-            Path candidate = tempDirectory().resolve(aiLogId + "." + extension).toAbsolutePath().normalize();
-            try {
-                if (Files.deleteIfExists(candidate)) {
-                    log.info("음식 이미지 임시 파일 정리 완료 aiLogId={}, path={}", aiLogId, candidate);
-                }
-            } catch (IOException e) {
-                log.warn("음식 이미지 임시 파일 정리 실패 aiLogId={}, path={}: {}", aiLogId, candidate, e.getMessage());
+        Path path = resolvePath(storageKey);
+        try {
+            if (Files.deleteIfExists(path)) {
+                log.info("음식 이미지 파일 삭제 완료 storageKey={}, path={}", storageKey, path);
+                deleteEmptyParents(path.getParent());
             }
+        } catch (IOException e) {
+            log.warn("음식 이미지 파일 삭제 실패 storageKey={}, path={}: {}", storageKey, path, e.getMessage());
         }
     }
 
-    private Path tempDirectory() {
-        return Paths.get(foodImageProperties.getTempDir()).toAbsolutePath().normalize();
+    private Path resolvePath(String storageKey) {
+        String normalizedKey = normalizeStorageKey(storageKey);
+        String firstShard = normalizedKey.substring(0, 2);
+        String secondShard = normalizedKey.substring(2, 4);
+
+        Path path = storageDirectory()
+                .resolve(firstShard)
+                .resolve(secondShard)
+                .resolve(normalizedKey)
+                .toAbsolutePath()
+                .normalize();
+
+        if (!path.startsWith(storageDirectory())) {
+            throw new IllegalArgumentException("invalid storage key path");
+        }
+        return path;
     }
 
-    private Path requireExistingPath(Long aiLogId) throws IOException {
-        Path normalized = resolveExistingPath(aiLogId);
+    private Path requireExistingPath(String storageKey) throws IOException {
+        Path normalized = resolvePath(storageKey);
         if (!Files.exists(normalized) || !Files.isRegularFile(normalized)) {
-            throw new IOException("temporary image file not found: " + normalized);
+            throw new IOException("stored image file not found: " + normalized);
         }
         return normalized;
     }
 
-    private Path resolveExistingPath(Long aiLogId) throws IOException {
-        if (aiLogId == null) {
-            throw new IOException("aiLogId is required");
+    private String detectContentType(Path path) {
+        try {
+            String detected = Files.probeContentType(path);
+            if (StringUtils.hasText(detected)) {
+                return detected;
+            }
+        } catch (IOException e) {
+            log.debug("이미지 contentType 감지 실패 path={}: {}", path, e.getMessage());
         }
 
-        for (String extension : ALLOWED_EXTENSIONS) {
-            Path candidate = tempDirectory().resolve(aiLogId + "." + extension).toAbsolutePath().normalize();
-            if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
-                return candidate;
+        String extension = getExtension(path.getFileName() != null ? path.getFileName().toString() : null);
+        return switch (extension) {
+            case "png" -> MediaType.IMAGE_PNG_VALUE;
+            case "webp" -> "image/webp";
+            default -> MediaType.IMAGE_JPEG_VALUE;
+        };
+    }
+
+    private void deleteEmptyParents(Path directory) {
+        Path root = storageDirectory();
+        Path current = directory;
+
+        while (current != null && !current.equals(root)) {
+            try {
+                if (Files.list(current).findAny().isPresent()) {
+                    return;
+                }
+                Files.deleteIfExists(current);
+            } catch (IOException e) {
+                return;
             }
+            current = current.getParent();
         }
-        throw new IOException("temporary image file not found for aiLogId=" + aiLogId + ", supportedExtensions=" + Arrays.toString(ALLOWED_EXTENSIONS.toArray()));
+    }
+
+    private String generateStorageKey(MultipartFile image) {
+        return UUID.randomUUID() + "." + canonicalExtension(image);
+    }
+
+    private String normalizeStorageKey(String storageKey) {
+        if (!StringUtils.hasText(storageKey)) {
+            throw new IllegalArgumentException("storageKey is required");
+        }
+
+        String normalized = storageKey.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
+            throw new IllegalArgumentException("invalid storageKey");
+        }
+        if (normalized.length() < 6) {
+            throw new IllegalArgumentException("storageKey is too short");
+        }
+        return normalized;
+    }
+
+    private Path storageDirectory() {
+        return Paths.get(foodImageProperties.getStorageDir()).toAbsolutePath().normalize();
     }
 
     private String canonicalExtension(MultipartFile image) {
@@ -163,7 +191,12 @@ public class FoodImageFileService {
         return StringUtils.hasText(extension) ? extension : "jpg";
     }
 
-    public record SavedFoodImage(Path path, String contentType) {}
+    private String getExtension(String filename) {
+        String extension = StringUtils.getFilenameExtension(filename);
+        return StringUtils.hasText(extension) ? extension.toLowerCase(Locale.ROOT) : "";
+    }
+
+    public record SavedFoodImage(String storageKey, Path path, String contentType) {}
+
+    public record LoadedFoodImage(byte[] data, String contentType) {}
 }
-
-

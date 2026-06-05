@@ -3,6 +3,8 @@ package ksu.finalproject.domain.analysis.service;
 import ksu.finalproject.domain.analysis.cache.AnalysisImageStore;
 import ksu.finalproject.domain.analysis.dto.LlmFoodAnalysisRequestDto;
 import ksu.finalproject.domain.analysis.dto.LlmFoodAnalysisResponseDto;
+import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
+import ksu.finalproject.domain.analysis.repository.AiAnalysisLogRepository;
 import ksu.finalproject.global.config.GoogleGeminiProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,7 @@ import java.util.Map;
 public class LlmService {
     private final RestTemplate restTemplate;
     private final AnalysisImageStore analysisImageStore;
+    private final AiAnalysisLogRepository aiAnalysisLogRepository;
     private final ObjectMapper objectMapper;
     private final GoogleGeminiProperties googleGeminiProperties;
 
@@ -38,7 +41,13 @@ public class LlmService {
             return null;
         }
 
-        AnalysisImageStore.CachedImage cachedImage = analysisImageStore.consume(request.getAiLogId());
+        AiAnalysisLog analysisLog = aiAnalysisLogRepository.findById(request.getAiLogId()).orElse(null);
+        if (analysisLog == null || !StringUtils.hasText(analysisLog.getImageKey())) {
+            log.warn("LLM fallback 실패 - imageKey가 없습니다. aiLogId={}", request.getAiLogId());
+            return null;
+        }
+
+        AnalysisImageStore.CachedImage cachedImage = analysisImageStore.load(analysisLog.getImageKey());
         if (cachedImage == null || cachedImage.data() == null || cachedImage.data().length == 0) {
             log.warn("LLM fallback 실패 - 캐시된 이미지가 없습니다. aiLogId={}", request.getAiLogId());
             return null;

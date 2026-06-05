@@ -2,16 +2,16 @@ package ksu.finalproject.domain.foodrecord.service;
 
 import ksu.finalproject.domain.analysis.dto.FoodAnalysisResultDto;
 import ksu.finalproject.domain.analysis.entity.AiAnalysisLog;
+import ksu.finalproject.domain.analysis.repository.AiAnalysisLogRepository;
 import ksu.finalproject.domain.food.entity.Food;
+import ksu.finalproject.domain.food.entity.enums.MealType;
+import ksu.finalproject.domain.food.repository.FoodRepository;
 import ksu.finalproject.domain.foodrecord.dto.DailyFoodRecordResponseDto;
 import ksu.finalproject.domain.foodrecord.dto.FoodRecordResponseDto;
 import ksu.finalproject.domain.foodrecord.dto.FoodRecordSaveRequestDto;
 import ksu.finalproject.domain.foodrecord.dto.MonthlyCalendarResponseDto;
 import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
-import ksu.finalproject.domain.food.entity.enums.MealType;
-import ksu.finalproject.domain.analysis.repository.AiAnalysisLogRepository;
 import ksu.finalproject.domain.foodrecord.repository.FoodRecordRepository;
-import ksu.finalproject.domain.food.repository.FoodRepository;
 import ksu.finalproject.domain.user.entity.Users;
 import ksu.finalproject.domain.user.repository.UserRepository;
 import ksu.finalproject.global.common.CustomException;
@@ -41,15 +41,10 @@ public class FoodRecordService {
     private final AiAnalysisLogRepository aiAnalysisLogRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 식사 기록을 저장합니다.
-     */
     @Transactional
     public FoodRecordResponseDto saveRecord(FoodRecordSaveRequestDto request, Long userId) throws CustomException {
         Users user = findUser(userId);
-
-        AiAnalysisLog aiAnalysisLog = findAiAnalysisLog(request.getAiLogId());
-
+        AiAnalysisLog aiAnalysisLog = findAiAnalysisLog(request.getAiLogId(), userId);
         Food food = resolveFood(request.getFoodId(), aiAnalysisLog);
 
         FoodRecord record = FoodRecord.builder()
@@ -59,7 +54,6 @@ public class FoodRecordService {
                 .foodName(request.getFoodName())
                 .eatenDate(request.getEatenDate())
                 .mealType(request.getMealType())
-//                .amountG(request.getAmountG())
                 .calories(request.getCalories())
                 .carbohydrate(request.getCarbohydrate())
                 .protein(request.getProtein())
@@ -73,24 +67,18 @@ public class FoodRecordService {
         return FoodRecordResponseDto.from(saved);
     }
 
-    /**
-     * 특정 날짜의 식사 기록을 식사 종류별로 조회합니다.
-     */
     @Transactional(readOnly = true)
     public DailyFoodRecordResponseDto getDailyRecord(LocalDate date, Long userId) throws CustomException {
         Users user = findUser(userId);
 
-        List<FoodRecord> records = foodRecordRepository
-                .findByUserAndEatenDateOrderByMealTypeAsc(user, date);
+        List<FoodRecord> records = foodRecordRepository.findByUserAndEatenDateOrderByMealTypeAsc(user, date);
 
-        // 식사 종류별 그룹핑
         Map<MealType, List<FoodRecordResponseDto>> meals = records.stream()
                 .collect(Collectors.groupingBy(
                         FoodRecord::getMealType,
                         Collectors.mapping(FoodRecordResponseDto::from, Collectors.toList())
                 ));
 
-        // 하루 총 칼로리
         double totalCalories = records.stream()
                 .mapToDouble(FoodRecord::getCalories)
                 .sum();
@@ -105,9 +93,6 @@ public class FoodRecordService {
                 .build();
     }
 
-    /**
-     * 특정 연월의 날짜별 총 칼로리를 캘린더 형태로 조회합니다.
-     */
     @Transactional(readOnly = true)
     public MonthlyCalendarResponseDto getMonthlyCalendar(int year, int month, Long userId) throws CustomException {
         Users user = findUser(userId);
@@ -116,10 +101,8 @@ public class FoodRecordService {
         LocalDate start = yearMonth.atDay(1);
         LocalDate end = yearMonth.atEndOfMonth();
 
-        List<FoodRecord> records = foodRecordRepository
-                .findByUserAndEatenDateBetween(user, start, end);
+        List<FoodRecord> records = foodRecordRepository.findByUserAndEatenDateBetween(user, start, end);
 
-        // 날짜별 칼로리 합산
         Map<LocalDate, Double> dailyCalories = records.stream()
                 .collect(Collectors.groupingBy(
                         FoodRecord::getEatenDate,
@@ -136,24 +119,21 @@ public class FoodRecordService {
                 .build();
     }
 
-    /**
-     * 식사 기록을 삭제합니다. 본인 기록만 삭제 가능합니다.
-     */
     @Transactional
     public void deleteRecord(Long recordId, Long userId) throws CustomException {
         FoodRecord record = foodRecordRepository.findById(recordId)
                 .orElseThrow(() -> {
-                    log.warn("식사 기록 삭제 실패 - 기록  recordId={}", recordId);
+                    log.warn("식사 기록 삭제 실패 - 기록 없음 recordId={}", recordId);
                     return new CustomException(ResponseCode.NOT_FOUND_FOOD_RECORD);
                 });
+
         if (!record.getUser().getId().equals(userId)) {
-            log.warn("식사 기록 삭제 실패 - 권한이 없습니다. recordId={}, requestUserId={}", recordId, userId);
+            log.warn("식사 기록 삭제 실패 - 권한 없음 recordId={}, requestUserId={}", recordId, userId);
             throw new CustomException(ResponseCode.FORBIDDEN);
         }
 
         record.deActivate();
-
-        log.info("식사 기록 비활성화 완료 userId={}", userId);
+        log.info("식사 기록 비활성화 완료 userId={}, recordId={}", userId, recordId);
     }
 
     private Users findUser(Long userId) throws CustomException {
@@ -164,14 +144,14 @@ public class FoodRecordService {
                 });
     }
 
-    private AiAnalysisLog findAiAnalysisLog(Long aiLogId) throws CustomException {
+    private AiAnalysisLog findAiAnalysisLog(Long aiLogId, Long userId) throws CustomException {
         if (aiLogId == null) {
             return null;
         }
 
-        return aiAnalysisLogRepository.findById(aiLogId)
+        return aiAnalysisLogRepository.findByIdAndUserId(aiLogId, userId)
                 .orElseThrow(() -> {
-                    log.warn("식사 기록 저장 실패 - AI 분석 로그 없음 aiLogId={}", aiLogId);
+                    log.warn("식사 기록 저장 실패 - 본인 소유 AI 분석 로그 없음 aiLogId={}, userId={}", aiLogId, userId);
                     return new CustomException(ResponseCode.NOT_FOUND_FOOD_IMAGE_ANALYSIS);
                 });
     }
@@ -226,4 +206,3 @@ public class FoodRecordService {
         }
     }
 }
-

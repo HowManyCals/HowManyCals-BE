@@ -33,8 +33,8 @@ public class AiAnalysisLog {
     @JoinColumn(name = "user_id", nullable = false) // -> user 필드가 DB의 user_id 외래 키 컬럼과 매핑됨을 의미
     private Users user;
 
-    @Column(name = "image_url")
-    private String imageUrl;
+    @Column(name = "image_key")
+    private String imageKey;
 
     @Column(name = "model_version")
     private String modelVersion;
@@ -67,6 +67,14 @@ public class AiAnalysisLog {
         this.rawOutput = rawOutput;
         this.inferenceTimeMs = inferenceTimeMs;
         this.analysisStatus = analysisStatus;
+    }
+
+    public void updateImageKey(String imageKey) {
+        this.imageKey = imageKey;
+    }
+
+    public void clearImageKey() {
+        this.imageKey = null;
     }
 
     public void success() {

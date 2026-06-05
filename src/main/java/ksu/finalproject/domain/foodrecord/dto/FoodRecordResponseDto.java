@@ -1,8 +1,8 @@
 package ksu.finalproject.domain.foodrecord.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import ksu.finalproject.domain.food.entity.enums.MealType;
+import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -20,6 +20,9 @@ public class FoodRecordResponseDto {
 
     @JsonProperty("ai_log_id")
     private Long aiLogId;
+
+    @JsonProperty("image_key")
+    private String imageKey;
 
     @JsonProperty("food_name")
     private String foodName;
@@ -50,6 +53,7 @@ public class FoodRecordResponseDto {
                 .recordId(record.getId())
                 .foodId(record.getFood() != null ? record.getFood().getId() : null)
                 .aiLogId(record.getAiAnalysisLog() != null ? record.getAiAnalysisLog().getId() : null)
+                .imageKey(record.getAiAnalysisLog() != null ? record.getAiAnalysisLog().getImageKey() : null)
                 .foodName(record.getFoodName())
                 .eatenDate(record.getEatenDate())
                 .mealType(record.getMealType())
@@ -60,4 +64,3 @@ public class FoodRecordResponseDto {
                 .build();
     }
 }
-

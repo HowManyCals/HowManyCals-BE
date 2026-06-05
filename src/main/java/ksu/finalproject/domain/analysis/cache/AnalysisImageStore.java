@@ -20,27 +20,23 @@ public class AnalysisImageStore {
         this.foodImageFileService = foodImageFileService;
     }
 
-    public void save(Long aiLogId, MultipartFile image) throws CustomException, IOException {
+    public String save(Long aiLogId, MultipartFile image) throws CustomException, IOException {
         FoodImageFileService.SavedFoodImage savedImage = foodImageFileService.save(aiLogId, image);
-        log.info("이미지 임시 파일 저장 완료 aiLogId={}, path={}", aiLogId, savedImage.path());
+        log.info("이미지 저장 완료 aiLogId={}, storageKey={}, path={}", aiLogId, savedImage.storageKey(), savedImage.path());
+        return savedImage.storageKey();
     }
 
-    public CachedImage consume(Long aiLogId) {
+    public CachedImage load(String imageKey) {
         try {
-            CachedImage cachedImage = new CachedImage(
-                    foodImageFileService.readBytes(aiLogId),
-                    foodImageFileService.detectContentType(aiLogId),
-                    LocalDateTime.now()
-            );
-            foodImageFileService.deleteByAiLogId(aiLogId);
-            return cachedImage;
+            FoodImageFileService.LoadedFoodImage loadedImage = foodImageFileService.load(imageKey);
+            return new CachedImage(loadedImage.data(), loadedImage.contentType(), LocalDateTime.now());
         } catch (IOException e) {
-            log.warn("임시 이미지 로드 실패 aiLogId={}: {}", aiLogId, e.getMessage());
+            log.warn("저장 이미지 로드 실패 imageKey={}: {}", imageKey, e.getMessage());
             return null;
         }
     }
 
-    public void delete(Long aiLogId) {
-        foodImageFileService.deleteByAiLogId(aiLogId);
+    public void delete(String imageKey) {
+        foodImageFileService.delete(imageKey);
     }
 }

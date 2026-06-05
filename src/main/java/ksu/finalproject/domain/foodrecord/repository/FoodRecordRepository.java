@@ -18,5 +18,7 @@ public interface FoodRecordRepository extends JpaRepository<FoodRecord, Long> {
 
     // 일별 상세: 특정 날짜의 모든 식사 기록 (식사 순서대로 정렬)
     List<FoodRecord> findByUserAndEatenDateOrderByMealTypeAsc(Users user, LocalDate date);
+
+    boolean existsByAiAnalysisLogIdAndIsActiveTrue(Long aiLogId);
 }
 

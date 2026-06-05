@@ -9,10 +9,11 @@ import lombok.Getter;
 @Builder
 @AllArgsConstructor
 public class FoodAnalyzeResponseDto {
-    // 분석 요청 상태
     private String status;
 
     @JsonProperty("ai_log_id")
     private Long aiLogId;
-}
 
+    @JsonProperty("image_key")
+    private String imageKey;
+}

@@ -1,6 +1,7 @@
 package ksu.finalproject.domain.food.entity;
 
 import jakarta.persistence.*;
+import ksu.finalproject.domain.food.entity.enums.SourceType;
 import ksu.finalproject.domain.food.entity.enums.ServingUnit;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -36,7 +37,15 @@ public class Food {
     @Column(name = "detail_category")
     private String detailCategory; // 예 : 바지락
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", nullable = false)
+    @Builder.Default
+    private SourceType sourceType = SourceType.MEAL;
+
     public String getDisplayName(){
+        if (sourceType == SourceType.PACKAGED && StringUtils.hasText(foodName)) {
+            return foodName;
+        }
         if (StringUtils.hasText(detailCategory) && StringUtils.hasText(subCategory)) {
             return detailCategory + " " + subCategory; // 예 : 바지락 칼국수
         }
@@ -57,6 +66,9 @@ public class Food {
     }
 
     public String getCanonicalName() {
+        if (sourceType == SourceType.PACKAGED) {
+            return foodName;
+        }
         if (StringUtils.hasText(detailCategory)) return detailCategory + subCategory; // 예 : 바지락칼국수
         return subCategory; // 예 : 칼국수
     }

@@ -1,6 +1,7 @@
 package ksu.finalproject.domain.food.service;
 
 import ksu.finalproject.domain.food.entity.Food;
+import ksu.finalproject.domain.food.entity.enums.SourceType;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,8 @@ public class FoodMatchService {
     private static final int MIN_FILTERED_CANDIDATE_POOL = 20;
     private static final int MAIN_CATEGORY_EXACT_BONUS = 8;
     private static final int MAIN_CATEGORY_MISMATCH_PENALTY = 8;
+    private static final int PACKAGED_FOOD_NAME_EXACT_BONUS = 16;
+    private static final int PACKAGED_FOOD_NAME_CONTAINS_BONUS = 8;
 
     private static final int RECOGNIZED_FOOD_NAME_EXACT_SCORE = 140;
     private static final int RECOGNIZED_CANONICAL_EXACT_SCORE = 130;
@@ -95,18 +98,21 @@ public class FoodMatchService {
         LinkedHashSet<Food> candidates = new LinkedHashSet<>();
         List<String> stageLogs = new ArrayList<>();
 
-        collectFilteredCandidates(candidates, stageLogs, normalizedMainCategory, normalizedBaseFood);
-        collectKeywordCandidates(candidates, stageLogs, normalizedMainCategory, normalizedRecognizedName, normalizedSearchTerms, normalizedBaseFood);
+        collectMealFilteredCandidates(candidates, stageLogs, normalizedMainCategory, normalizedBaseFood);
+        collectMealKeywordCandidates(candidates, stageLogs, normalizedMainCategory, normalizedRecognizedName, normalizedSearchTerms, normalizedBaseFood);
+        collectPackagedCandidates(candidates, stageLogs, normalizedRecognizedName, normalizedSearchTerms, normalizedBaseFood);
 
         if (candidates.isEmpty() && StringUtils.hasText(normalizedBaseFood)) {
             int beforeExact = candidates.size();
-            candidates.addAll(foodRepository.findAllActiveByNormalizedSubCategoryExact(normalizedBaseFood));
-            stageLogs.add("global_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
+            candidates.addAll(foodRepository.findAllActiveBySourceTypeAndNormalizedSubCategoryExact(SourceType.MEAL, normalizedBaseFood));
+            stageLogs.add("meal_global_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
         }
 
         if (candidates.isEmpty()) {
-            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_recognized", List.of(normalizedRecognizedName));
-            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_search_terms", normalizedSearchTerms);
+            addGlobalKeywordSearchResults(candidates, stageLogs, "meal_global_keyword_recognized", SourceType.MEAL, List.of(normalizedRecognizedName));
+            addGlobalKeywordSearchResults(candidates, stageLogs, "meal_global_keyword_search_terms", SourceType.MEAL, normalizedSearchTerms);
+            addPackagedGlobalFoodNameSearchResults(candidates, stageLogs, "packaged_global_food_name_recognized", List.of(normalizedRecognizedName));
+            addPackagedGlobalFoodNameSearchResults(candidates, stageLogs, "packaged_global_food_name_search_terms", normalizedSearchTerms);
         }
 
         log.info("food-match candidate-pool stageLogs={}, candidateCount={}", stageLogs, candidates.size());
@@ -177,8 +183,15 @@ public class FoodMatchService {
         }
 
         LinkedHashSet<Food> results = new LinkedHashSet<>();
-        results.addAll(foodRepository.findAllActiveByNormalizedSubCategoryExact(normalizedQuery));
-        results.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(
+        results.addAll(foodRepository.findAllActiveBySourceTypeAndNormalizedFoodNameExact(SourceType.PACKAGED, normalizedQuery));
+        results.addAll(foodRepository.findAllActiveBySourceTypeAndNormalizedSubCategoryExact(SourceType.MEAL, normalizedQuery));
+        results.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedFoodNameContains(
+                SourceType.PACKAGED,
+                normalizedQuery,
+                PageRequest.of(0, Math.max(limit, MANUAL_SEARCH_LIMIT))
+        ));
+        results.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedKeyword(
+                SourceType.MEAL,
                 normalizedQuery,
                 PageRequest.of(0, Math.max(limit, MANUAL_SEARCH_LIMIT))
         ));
@@ -189,7 +202,7 @@ public class FoodMatchService {
         return normalizeKey(value);
     }
 
-    private void collectFilteredCandidates(
+    private void collectMealFilteredCandidates(
             Set<Food> candidates,
             List<String> stageLogs,
             String normalizedMainCategory,
@@ -200,24 +213,26 @@ public class FoodMatchService {
         }
 
         int beforeExact = candidates.size();
-        candidates.addAll(foodRepository.findAllActiveByNormalizedMainCategoryAndNormalizedSubCategoryExact(
+        candidates.addAll(foodRepository.findAllActiveBySourceTypeAndNormalizedMainCategoryAndNormalizedSubCategoryExact(
+                SourceType.MEAL,
                 normalizedMainCategory,
                 normalizedBaseFood
         ));
-        stageLogs.add("main_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
+        stageLogs.add("meal_main_sub_exact +" + (candidates.size() - beforeExact) + " => " + candidates.size());
 
         if (candidates.size() < MIN_FILTERED_CANDIDATE_POOL) {
             int beforeContains = candidates.size();
-            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedMainCategoryAndNormalizedSubCategoryContains(
+            candidates.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedMainCategoryAndNormalizedSubCategoryContains(
+                    SourceType.MEAL,
                     normalizedMainCategory,
                     normalizedBaseFood,
                     PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
             ));
-            stageLogs.add("main_sub_contains +" + (candidates.size() - beforeContains) + " => " + candidates.size());
+            stageLogs.add("meal_main_sub_contains +" + (candidates.size() - beforeContains) + " => " + candidates.size());
         }
     }
 
-    private void collectKeywordCandidates(
+    private void collectMealKeywordCandidates(
             Set<Food> candidates,
             List<String> stageLogs,
             String normalizedMainCategory,
@@ -226,19 +241,39 @@ public class FoodMatchService {
             String normalizedBaseFood
     ) {
         if (StringUtils.hasText(normalizedMainCategory)) {
-            addMainKeywordSearchResults(candidates, stageLogs, "main_keyword_recognized", normalizedMainCategory, List.of(normalizedRecognizedName));
+            addMainKeywordSearchResults(candidates, stageLogs, "meal_main_keyword_recognized", SourceType.MEAL, normalizedMainCategory, List.of(normalizedRecognizedName));
             if (candidates.size() < MIN_FILTERED_CANDIDATE_POOL) {
-                addMainKeywordSearchResults(candidates, stageLogs, "main_keyword_search_terms", normalizedMainCategory, normalizedSearchTerms);
+                addMainKeywordSearchResults(candidates, stageLogs, "meal_main_keyword_search_terms", SourceType.MEAL, normalizedMainCategory, normalizedSearchTerms);
             }
         }
 
         if (candidates.isEmpty()) {
-            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_recognized", List.of(normalizedRecognizedName));
-            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_search_terms", normalizedSearchTerms);
+            addGlobalKeywordSearchResults(candidates, stageLogs, "meal_global_keyword_recognized", SourceType.MEAL, List.of(normalizedRecognizedName));
+            addGlobalKeywordSearchResults(candidates, stageLogs, "meal_global_keyword_search_terms", SourceType.MEAL, normalizedSearchTerms);
         }
 
         if (candidates.isEmpty() && StringUtils.hasText(normalizedBaseFood)) {
-            addGlobalKeywordSearchResults(candidates, stageLogs, "global_keyword_base_food", List.of(normalizedBaseFood));
+            addGlobalKeywordSearchResults(candidates, stageLogs, "meal_global_keyword_base_food", SourceType.MEAL, List.of(normalizedBaseFood));
+        }
+    }
+
+    private void collectPackagedCandidates(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String normalizedRecognizedName,
+            List<String> normalizedSearchTerms,
+            String normalizedBaseFood
+    ) {
+        addPackagedExactFoodNameResults(candidates, stageLogs, "packaged_food_exact_recognized", List.of(normalizedRecognizedName));
+        addPackagedExactFoodNameResults(candidates, stageLogs, "packaged_food_exact_search_terms", normalizedSearchTerms);
+
+        if (candidates.size() < MIN_FILTERED_CANDIDATE_POOL) {
+            addPackagedFoodNameContainsResults(candidates, stageLogs, "packaged_food_contains_recognized", List.of(normalizedRecognizedName));
+            addPackagedFoodNameContainsResults(candidates, stageLogs, "packaged_food_contains_search_terms", normalizedSearchTerms);
+        }
+
+        if (candidates.isEmpty() && StringUtils.hasText(normalizedBaseFood)) {
+            addPackagedFoodNameContainsResults(candidates, stageLogs, "packaged_food_contains_base_food", List.of(normalizedBaseFood));
         }
     }
 
@@ -246,6 +281,7 @@ public class FoodMatchService {
             Set<Food> candidates,
             List<String> stageLogs,
             String stage,
+            SourceType sourceType,
             String normalizedMainCategory,
             Collection<String> keywords
     ) {
@@ -256,7 +292,8 @@ public class FoodMatchService {
 
         int before = candidates.size();
         for (String keyword : normalizedKeywords) {
-            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedMainCategoryAndNormalizedKeyword(
+            candidates.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedMainCategoryAndNormalizedKeyword(
+                    sourceType,
                     normalizedMainCategory,
                     keyword,
                     PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
@@ -269,6 +306,7 @@ public class FoodMatchService {
             Set<Food> candidates,
             List<String> stageLogs,
             String stage,
+            SourceType sourceType,
             Collection<String> keywords
     ) {
         List<String> normalizedKeywords = compactKeywords(keywords);
@@ -278,12 +316,62 @@ public class FoodMatchService {
 
         int before = candidates.size();
         for (String keyword : normalizedKeywords) {
-            candidates.addAll(foodRepository.searchActiveFoodsByNormalizedKeyword(
+            candidates.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedKeyword(
+                    sourceType,
                     keyword,
                     PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
             ));
         }
         stageLogs.add(stage + " keywords=" + normalizedKeywords + " +" + (candidates.size() - before) + " => " + candidates.size());
+    }
+
+    private void addPackagedExactFoodNameResults(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String stage,
+            Collection<String> keywords
+    ) {
+        List<String> normalizedKeywords = compactKeywords(keywords);
+        if (normalizedKeywords.isEmpty()) {
+            return;
+        }
+
+        int before = candidates.size();
+        for (String keyword : normalizedKeywords) {
+            candidates.addAll(foodRepository.findAllActiveBySourceTypeAndNormalizedFoodNameExact(SourceType.PACKAGED, keyword));
+        }
+        stageLogs.add(stage + " keywords=" + normalizedKeywords + " +" + (candidates.size() - before) + " => " + candidates.size());
+    }
+
+    private void addPackagedFoodNameContainsResults(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String stage,
+            Collection<String> keywords
+    ) {
+        List<String> normalizedKeywords = compactKeywords(keywords);
+        if (normalizedKeywords.isEmpty()) {
+            return;
+        }
+
+        int before = candidates.size();
+        for (String keyword : normalizedKeywords) {
+            candidates.addAll(foodRepository.searchActiveFoodsBySourceTypeAndNormalizedFoodNameContains(
+                    SourceType.PACKAGED,
+                    keyword,
+                    PageRequest.of(0, DEFAULT_CANDIDATE_LIMIT)
+            ));
+        }
+        stageLogs.add(stage + " keywords=" + normalizedKeywords + " +" + (candidates.size() - before) + " => " + candidates.size());
+    }
+
+    private void addPackagedGlobalFoodNameSearchResults(
+            Set<Food> candidates,
+            List<String> stageLogs,
+            String stage,
+            Collection<String> keywords
+    ) {
+        addPackagedFoodNameContainsResults(candidates, stageLogs, stage, keywords);
     }
 
     private List<String> compactKeywords(Collection<String> keywords) {
@@ -378,10 +466,14 @@ public class FoodMatchService {
         String normalizedDetailCategory = normalizeKey(food.getDetailCategory());
         String normalizedSuffix = normalizeKey(extractSuffix(food));
         String normalizedMain = normalizeKey(food.getMainCategory());
+        boolean packagedFood = food.getSourceType() == SourceType.PACKAGED;
 
         if (StringUtils.hasText(normalizedRecognizedName)) {
             if (normalizedRecognizedName.equals(normalizedFoodName)) {
                 score += RECOGNIZED_FOOD_NAME_EXACT_SCORE;
+                if (packagedFood) {
+                    score += PACKAGED_FOOD_NAME_EXACT_BONUS;
+                }
                 reasons.add("recognized_name_food_exact");
             } else if (normalizedRecognizedName.equals(normalizedCanonicalName)) {
                 score += RECOGNIZED_CANONICAL_EXACT_SCORE;
@@ -391,6 +483,9 @@ public class FoodMatchService {
                 reasons.add("recognized_name_suffix_exact");
             } else if (StringUtils.hasText(normalizedFoodName) && normalizedFoodName.contains(normalizedRecognizedName)) {
                 score += RECOGNIZED_FOOD_NAME_CONTAINS_SCORE;
+                if (packagedFood) {
+                    score += PACKAGED_FOOD_NAME_CONTAINS_BONUS;
+                }
                 reasons.add("recognized_name_food_contains");
             } else if (StringUtils.hasText(normalizedCanonicalName) && normalizedCanonicalName.contains(normalizedRecognizedName)) {
                 score += RECOGNIZED_CANONICAL_CONTAINS_SCORE;

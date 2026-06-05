@@ -1,6 +1,7 @@
 package ksu.finalproject.domain.recommendation.service;
 
 import ksu.finalproject.domain.food.entity.Food;
+import ksu.finalproject.domain.food.entity.enums.SourceType;
 import ksu.finalproject.domain.food.repository.FoodRepository;
 import ksu.finalproject.domain.foodrecord.entity.FoodRecord;
 import ksu.finalproject.domain.foodrecord.repository.FoodRecordRepository;
@@ -110,7 +111,7 @@ public class RecommendationInputService {
     }
 
     private List<DietRecommendationEngine.Food> loadFoods() {
-        return foodRepository.findAllByIsActiveTrue().stream()
+        return foodRepository.findAllByIsActiveTrueAndSourceType(SourceType.MEAL).stream()
                 .filter(food -> food.getServingKcal() != null && food.getServingKcal() > 0)
                 .map(this::toRecommendationFood)
                 .toList();

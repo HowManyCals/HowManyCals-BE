@@ -48,6 +48,7 @@ public class ManualFoodSearchService {
                 .protein(food.getProtein())
                 .fat(food.getFat())
                 .servingUnitLabel(food.getServingUnit() != null ? food.getServingUnit().toDisplayLabel(food.getServingWeight()) : null)
+                .sourceType(food.getSourceType())
                 .dataSource(DataSource.DB_EXACT)
                 .build();
     }

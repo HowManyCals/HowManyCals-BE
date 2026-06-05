@@ -26,7 +26,6 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class FoodAnalysisResultProcessorService {
-    private static final String UNMATCHED_FOOD_NAME = "UNMATCHED";
     private static final int TOP_CANDIDATE_LIMIT = 15;
     private static final int AMBIGUOUS_RESPONSE_LIMIT = 3;
     private static final int AUTO_CONFIRM_SCORE_THRESHOLD = 85;
@@ -37,6 +36,8 @@ public class FoodAnalysisResultProcessorService {
     private final LlmService llmService;
     private final UnmatchedFoodLogRepository unmatchedFoodLogRepository;
 
+    // AI 서버에서 콜백으로 넘어온 분석 결과를 받아서 후처리 파이프라인의 진입점 역할을 합니다.
+    // 후보가 없으면 빈 리스트로 바로 반환하고, 있으면 첫 번째 후보만 처리합니다. (실질적으로 AI 모델이 1개만 넘깁니다)
     public FoodAnalysisResultDto process(AiAnalysisCallbackDto result) {
         List<AiAnalysisCandidateDto> candidates = result.getCandidates();
         log.info("음식 후보 후처리 시작 aiLogId={}, candidateCount={}",
@@ -48,7 +49,7 @@ public class FoodAnalysisResultProcessorService {
             return toResponseDto(result, Collections.emptyList());
         }
 
-        AiAnalysisCandidateDto primaryCandidate = candidates.get(0);
+        AiAnalysisCandidateDto primaryCandidate = candidates.get(0); // 가장 처음의 후보만 받음. 실질적으로는 1개임
         List<FoodAnalyzeCandidateDto> processedCandidates = processPrimaryCandidate(result.getAiLogId(), primaryCandidate);
 
         log.info("음식 후보 후처리 완료 aiLogId={}, processedCandidateCount={}",
@@ -58,6 +59,9 @@ public class FoodAnalysisResultProcessorService {
         return toResponseDto(result, processedCandidates);
     }
 
+    // 전달받은 음식 후보(1개)에 대하여 신뢰도 60% 기준으로 LLM 분기를 할지말지 결정합니다.
+    // 신뢰도 >= 0.6이면 foodName을 그대로 matchFoods에 넘겨 정규화 -> Levenshtein 매핑을 시도합니다.
+    // 신뢰도 < 0.6이면 AI가 뭘 봤는지 불확실한 거니까 LLM한테 한 번 더 물어보는 방향으로 분기합니다.
     private List<FoodAnalyzeCandidateDto> processPrimaryCandidate(Long aiLogId, AiAnalysisCandidateDto candidate) {
         log.info("음식 후보 검사 시작 aiLogId={}, foodName={}, confidenceScore={}",
                 aiLogId,
@@ -84,42 +88,9 @@ public class FoodAnalysisResultProcessorService {
         return selectResponseCandidates(aiLogId, candidate, null, matches, "AI_DIRECT");
     }
 
-    public List<FoodAnalyzeCandidateDto> processDebugLlmBranch(
-            Long aiLogId,
-            Double confidenceScore,
-            LlmFoodAnalysisResponseDto llmResponse
-    ) {
-        if (llmResponse == null || (!StringUtils.hasText(llmResponse.getRecognizedName()) && !StringUtils.hasText(llmResponse.getBaseFood()))) {
-            return List.of();
-        }
-
-        AiAnalysisCandidateDto candidate = AiAnalysisCandidateDto.builder()
-                .aiModelIndex(0)
-                .confidenceScore(confidenceScore)
-                .foodName(StringUtils.hasText(llmResponse.getRecognizedName()) ? llmResponse.getRecognizedName() : llmResponse.getBaseFood())
-                .build();
-
-        List<FoodMatchService.MatchResult> matches = foodMatchService.matchFoods(
-                llmResponse.getMainCategory(),
-                llmResponse.getBaseFood(),
-                llmResponse.getRecognizedName(),
-                llmResponse.getModifiers(),
-                llmResponse.getSearchTerms(),
-                TOP_CANDIDATE_LIMIT
-        );
-        if (matches.isEmpty()) {
-            return List.of(FoodAnalyzeCandidateDto.builder()
-                    .aiModelIndex(candidate.getAiModelIndex())
-                    .confidenceScore(candidate.getConfidenceScore())
-                    .recognizedName(candidate.getFoodName())
-                    .matchedFoodName(null)
-                    .dataSource(DataSource.UNMATCHED)
-                    .build());
-        }
-
-        return selectResponseCandidates(aiLogId, candidate, llmResponse, matches, "DEBUG_LLM_BRANCH");
-    }
-
+    // 신뢰도가 낮아서 AI가 뭘 인식했는지 불확실한 경우 LLM에게 음식명을 재추론 요청합니다.
+    // LLM이 반환한 recognizedName, baseFood, modifiers, searchTerms를 분해해서 matchFoods에 넘깁니다.
+    // LLM 응답 자체가 비었거나 구조가 이상하면 그냥 UNMATCHED로 처리합니다.
     private List<FoodAnalyzeCandidateDto> processWithLlmBranch(Long aiLogId, AiAnalysisCandidateDto candidate) {
         log.info("음식 신뢰도 60% 미만 - LLM branch 진행 aiLogId={}, foodName={}, confidenceScore={}",
                 aiLogId,
@@ -174,6 +145,9 @@ public class FoodAnalysisResultProcessorService {
         return selectResponseCandidates(aiLogId, llmCandidate, llmResponse, matches, "LLM_BRANCH");
     }
 
+    // matchFoods로 받은 후보 리스트를 정제해서 최종적으로 FE에 내려줄 후보 목록을 결정합니다.
+    // 약한 후보 필터링 -> 중복 제거 -> 자동확정 / 단일 distinct / 다중 후보 순으로 판단합니다.
+    // 어떤 경로로 왔든(AI_DIRECT / LLM_BRANCH) 매칭 후 공통으로 이 메서드를 거칩니다.
     private List<FoodAnalyzeCandidateDto> selectResponseCandidates(
             Long aiLogId,
             AiAnalysisCandidateDto candidate,
@@ -277,6 +251,7 @@ public class FoodAnalysisResultProcessorService {
         return buildMatchedResponse(branch, aiLogId, "AMBIGUOUS_TOP" + selectedMatches.size(), candidate, selectedMatches);
     }
 
+    // 매칭된 Food 엔티티의 reason을 보고 exact 매칭인지 fuzzy 매칭인지 구분해서 DataSource를 결정합니다.
     private DataSource resolveDataSource(FoodMatchService.MatchResult match) {
         String reason = match.reason();
         if (reason.contains("recognized_name_food_exact")
@@ -287,6 +262,8 @@ public class FoodAnalysisResultProcessorService {
         return DataSource.DB_FUZZY;
     }
 
+    // 1등 후보가 너무 약해서 아예 반환할 가치가 없는지 판단합니다.
+    // 점수가 25 미만이고 strong match도 없으면 UNMATCHED 처리, main_category_mismatch가 붙은 경우도 마찬가지입니다.
     private boolean shouldTreatAsUnmatched(FoodMatchService.MatchResult topMatch) {
         if (topMatch == null) {
             return true;
@@ -300,6 +277,9 @@ public class FoodAnalysisResultProcessorService {
         return !strongMatch && topMatch.reason() != null && topMatch.reason().contains("main_category_mismatch");
     }
 
+    // 브랜드형 가공식품(빵/과자류) 케이스에서 weak fuzzy 후보들을 미리 걸러냅니다.
+    // subCategory가 baseFood나 recognizedName과 연관이 없으면 그냥 제거합니다.
+    // strong match 이유가 있는 후보는 절대 제거하지 않습니다.
     private List<FoodMatchService.MatchResult> filterWeakProcessedFoodCandidates(
             String branch,
             Long aiLogId,
@@ -333,6 +313,7 @@ public class FoodAnalysisResultProcessorService {
         return filtered;
     }
 
+    // 후보 하나가 제거 대상인지 판단하는 세부 로직입니다. filterWeakProcessedFoodCandidates에서 루프 돌면서 호출합니다.
     private boolean shouldDropWeakProcessedFoodCandidate(
             String normalizedRecognizedName,
             String normalizedBaseFood,
@@ -363,6 +344,8 @@ public class FoodAnalysisResultProcessorService {
         return true;
     }
 
+    // 브랜드형 가공식품인데 필터링 후에도 남은 후보가 전부 weak fuzzy뿐이면 UNMATCHED로 떨굽니다.
+    // strong match 하나라도 있으면 통과시킵니다.
     private boolean shouldTreatProcessedFoodFuzzyAsUnmatched(
             LlmFoodAnalysisResponseDto llmResponse,
             List<FoodMatchService.MatchResult> distinctMatches
@@ -374,6 +357,8 @@ public class FoodAnalysisResultProcessorService {
         return distinctMatches.stream().noneMatch(match -> hasStrongMatchReason(match.reason()));
     }
 
+    // LLM 응답의 mainCategory가 "빵및과자류"인지 확인합니다.
+    // 이 케이스는 브랜드명 기반 가공식품이 많아서 weak fuzzy 매칭을 더 엄격하게 처리해야 합니다.
     private boolean isProcessedBakeryCase(LlmFoodAnalysisResponseDto llmResponse) {
         if (llmResponse == null) {
             return false;
@@ -383,6 +368,8 @@ public class FoodAnalysisResultProcessorService {
         return "빵및과자류".equals(normalizedMainCategory);
     }
 
+    // reason에 exact 계열 키워드가 하나라도 있으면 strong match로 봅니다.
+    // 이 기준을 통과해야 단일 distinct 반환이나 자동 확정이 가능합니다.
     private boolean hasStrongMatchReason(String reason) {
         if (!StringUtils.hasText(reason)) {
             return false;
@@ -396,6 +383,8 @@ public class FoodAnalysisResultProcessorService {
                 || reason.contains("modifier_detail_exact");
     }
 
+    // 1등 후보를 FE에 단독으로 자동 확정해도 되는지 판단합니다.
+    // 점수 85 이상 + 2등과 점수 차 15 이상 + strong match + main_category_mismatch 없어야 통과합니다.
     private boolean canAutoConfirm(FoodMatchService.MatchResult topMatch, int gap) {
         if (topMatch == null) {
             return false;
@@ -412,6 +401,9 @@ public class FoodAnalysisResultProcessorService {
         return topMatch.reason() == null || !topMatch.reason().contains("main_category_mismatch");
     }
 
+    // 매칭 결과에서 표시명 기준으로 중복된 후보를 제거합니다.
+    // strong match 후보는 displayName 기준, 일반 후보는 foodName 기준으로 dedupeKey를 잡습니다.
+    // 같은 key면 먼저 들어온 것(점수 높은 것)을 유지합니다.
     private List<FoodMatchService.MatchResult> deduplicateMatches(
             String branch,
             Long aiLogId,
@@ -455,6 +447,7 @@ public class FoodAnalysisResultProcessorService {
         return new ArrayList<>(bestByDisplayName.values());
     }
 
+    // 중복 제거 키를 결정합니다. strong match면 displayName 기준, 아니면 foodName 기준입니다.
     private String resolveDedupeKey(FoodMatchService.MatchResult match) {
         if (match == null || match.food() == null) {
             return null;
@@ -471,6 +464,7 @@ public class FoodAnalysisResultProcessorService {
         return foodMatchService.normalizeAndApplySynonyms(match.food().getDisplayName());
     }
 
+    // 로그에 찍을 요약 문자열을 만드는 헬퍼입니다. 최대 5개까지만 찍습니다.
     private String summarizeMatches(List<FoodMatchService.MatchResult> matches) {
         return matches.stream()
                 .limit(5)
@@ -486,6 +480,7 @@ public class FoodAnalysisResultProcessorService {
                 .orElse("none");
     }
 
+    // 선택된 매칭 결과를 FoodAnalyzeCandidateDto 리스트로 변환하고 로그를 남깁니다.
     private List<FoodAnalyzeCandidateDto> buildMatchedResponse(
             String branch,
             Long aiLogId,
@@ -500,6 +495,7 @@ public class FoodAnalysisResultProcessorService {
         return responseCandidates;
     }
 
+    // DB 매핑 결과를 로그로 남기는 헬퍼입니다.
     private void logDbMappingResult(
             String branch,
             Long aiLogId,
@@ -517,6 +513,7 @@ public class FoodAnalysisResultProcessorService {
                 summarizeMappedResults(selectedMatches, responseCandidates));
     }
 
+    // 로그에 찍을 매핑 결과 요약 문자열을 만드는 헬퍼입니다.
     private String summarizeMappedResults(
             List<FoodMatchService.MatchResult> matches,
             List<FoodAnalyzeCandidateDto> responseCandidates
@@ -558,6 +555,7 @@ public class FoodAnalysisResultProcessorService {
         return String.join(" | ", summaries);
     }
 
+    // AiAnalysisCallbackDto를 FE에 내려줄 FoodAnalysisResultDto로 변환합니다.
     private FoodAnalysisResultDto toResponseDto(AiAnalysisCallbackDto result, List<FoodAnalyzeCandidateDto> candidates) {
         return FoodAnalysisResultDto.builder()
                 .analysisStatus(result.getAnalysisStatus())
@@ -569,6 +567,7 @@ public class FoodAnalysisResultProcessorService {
                 .build();
     }
 
+    // 매칭 성공 시 Food 엔티티의 영양정보, sourceType, dataSource를 DTO에 담아 반환합니다.
     private FoodAnalyzeCandidateDto buildMatchedCandidate(AiAnalysisCandidateDto candidate, Food food, DataSource dataSource) {
         String recognizedName = candidate != null ? candidate.getFoodName() : null;
         String matchedFoodName = food != null ? food.getDisplayName() : recognizedName;
@@ -584,10 +583,13 @@ public class FoodAnalysisResultProcessorService {
                 .protein(food != null ? food.getProtein() : null)
                 .fat(food != null ? food.getFat() : null)
                 .servingUnitLabel(resolveServingUnitLabel(candidate, food))
+                .sourceType(food != null ? food.getSourceType() : null)
                 .dataSource(dataSource)
                 .build();
     }
 
+    // 매칭 실패 시 영양정보 없이 recognizedName만 담은 UNMATCHED 후보를 반환합니다.
+    // 동시에 UnmatchedFoodLog에 기록을 남겨 나중에 DB 확장에 활용할 수 있도록 합니다.
     private FoodAnalyzeCandidateDto buildUnmatchedCandidate(
             Long aiLogId,
             AiAnalysisCandidateDto candidate,
@@ -613,10 +615,12 @@ public class FoodAnalysisResultProcessorService {
                 .recognizedName(responseRecognizedName)
                 .matchedFoodName(null)
                 .servingUnitLabel(candidate.getServingUnitLabel())
+                .sourceType(null)
                 .dataSource(DataSource.UNMATCHED)
                 .build();
     }
 
+    // 매칭 실패 정보를 UnmatchedFoodLog 엔티티로 저장합니다. 나중에 DB 품질 개선에 활용합니다.
     private void saveUnmatchedLog(
             Long aiLogId,
             AiAnalysisCandidateDto candidate,
@@ -634,6 +638,7 @@ public class FoodAnalysisResultProcessorService {
                 .build());
     }
 
+    // modifier 리스트를 콤마로 이어붙여 단일 문자열로 만듭니다. DB 저장용입니다.
     private String joinModifiers(List<String> modifiers) {
         if (modifiers == null || modifiers.isEmpty()) {
             return null;
@@ -645,6 +650,8 @@ public class FoodAnalysisResultProcessorService {
                 .orElse(null);
     }
 
+    // FE에 내려줄 serving_unit_label을 결정합니다.
+    // Food 엔티티에 servingUnit이 있으면 그걸 우선 쓰고, 없으면 AI가 넘겨준 라벨을 그대로 씁니다.
     private String resolveServingUnitLabel(AiAnalysisCandidateDto candidate, Food food) {
         if (food != null && food.getServingUnit() != null) {
             return food.getServingUnit().toDisplayLabel(food.getServingWeight());

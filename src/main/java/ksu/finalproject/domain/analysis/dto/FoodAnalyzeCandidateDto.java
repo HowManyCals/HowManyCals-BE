@@ -2,6 +2,7 @@ package ksu.finalproject.domain.analysis.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import ksu.finalproject.domain.analysis.entity.DataSource;
+import ksu.finalproject.domain.food.entity.enums.SourceType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,7 +28,6 @@ public class FoodAnalyzeCandidateDto {
     @JsonProperty("matched_food_name")
     private String matchedFoodName;
 
-
     @JsonProperty("serving_kcal")
     private Double servingKcal;
 
@@ -42,6 +42,9 @@ public class FoodAnalyzeCandidateDto {
 
     @JsonProperty("serving_unit_label")
     private String servingUnitLabel;
+
+    @JsonProperty("source_type")
+    private SourceType sourceType;
 
     @JsonProperty("data_source")
     private DataSource dataSource;

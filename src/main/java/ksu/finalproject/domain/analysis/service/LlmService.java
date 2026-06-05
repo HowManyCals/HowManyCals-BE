@@ -100,7 +100,8 @@ public class LlmService {
         String mimeType = StringUtils.hasText(cachedImage.contentType()) ? cachedImage.contentType() : "image/jpeg";
         String base64Image = Base64.getEncoder().encodeToString(cachedImage.data());
 
-        Map<String, Object> textPart = Map.of("text", buildPrompt());
+        // 1. 유저 파트에는 순수하게 이미지와 분석 요청 텍스트만 전달
+        Map<String, Object> textPart = Map.of("text", "이 음식 이미지를 분석해서 규칙에 맞는 JSON 데이터로 추출해줘.");
         Map<String, Object> imagePart = Map.of(
                 "inlineData", Map.of(
                         "mimeType", mimeType,
@@ -113,15 +114,37 @@ public class LlmService {
                 "parts", List.of(textPart, imagePart)
         );
 
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.1);
-        generationConfig.put("topP", 0.95);
-        generationConfig.put("maxOutputTokens", 768);
-        generationConfig.put("responseMimeType", "application/json");
+        // 2. 원하는 JSON 출력 구조(Schema)를 명확히 정의
+        Map<String, Object> schema = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "recognized_name", Map.of("type", "STRING"),
+                        "main_category", Map.of("type", "STRING"),
+                        "base_food", Map.of("type", "STRING"),
+                        "modifiers", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                        "search_terms", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
+                ),
+                "required", List.of("recognized_name", "main_category", "base_food", "modifiers", "search_terms")
+        );
 
+        // 3. Generation Config 설정
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 1.0);
+        generationConfig.put("topP", 0.95);
+        generationConfig.put("maxOutputTokens", 768); // 768~1024
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.put("responseSchema", schema); // 스키마 강제 적용
+
+        // 4. 요청 바디 구성 (System Instruction을 별도 필드로 분리)
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("contents", List.of(content));
         requestBody.put("generationConfig", generationConfig);
+
+        // 프롬프트 규칙들을 systemInstruction 필드로 바인딩
+        requestBody.put("systemInstruction", Map.of(
+                "parts", List.of(Map.of("text", buildPrompt()))
+        ));
+
         return requestBody;
     }
 

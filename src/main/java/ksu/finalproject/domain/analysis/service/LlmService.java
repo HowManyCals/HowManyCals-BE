@@ -115,8 +115,8 @@ public class LlmService {
 
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.1);
-        generationConfig.put("topP", 0.8);
-        generationConfig.put("maxOutputTokens", 384);
+        generationConfig.put("topP", 0.95);
+        generationConfig.put("maxOutputTokens", 768);
         generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> requestBody = new HashMap<>();

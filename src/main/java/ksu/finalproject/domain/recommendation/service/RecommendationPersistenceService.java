@@ -80,13 +80,18 @@ public class RecommendationPersistenceService {
         for (DietRecommendationEngine.MealRecommendation meal : recommendation.meals()) {
             for (int i = 0; i < meal.foods().size(); i++) {
                 DietRecommendationEngine.Food food = meal.foods().get(i);
+                ksu.finalproject.domain.food.entity.Food foodEntity =
+                        foodRepository.findById((long) food.foodId()).orElse(null);
                 items.add(MealRecommendationItem.builder()
-                        .food(foodRepository.findById((long) food.foodId()).orElse(null))
+                        .food(foodEntity)
                         .mealType(toDomainMealType(meal.mealType()))
                         .foodNameSnapshot(food.displayName())
                         .groupNameSnapshot(food.groupName())
                         .displayOrder(i + 1)
                         .caloriesSnapshot(food.calories())
+                        .carbohydrateSnapshot(foodEntity != null ? foodEntity.getCarbohydrate() : null)
+                        .proteinSnapshot(foodEntity != null ? foodEntity.getProtein() : null)
+                        .fatSnapshot(foodEntity != null ? foodEntity.getFat() : null)
                         .build());
             }
         }

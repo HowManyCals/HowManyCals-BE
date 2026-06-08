@@ -38,6 +38,9 @@ public class RecommendationQueryService {
                             .groupName(item.getGroupNameSnapshot())
                             .displayOrder(item.getDisplayOrder())
                             .calories(item.getCaloriesSnapshot())
+                            .carbohydrate(item.getCarbohydrateSnapshot())
+                            .protein(item.getProteinSnapshot())
+                            .fat(item.getFatSnapshot())
                             .build())
                     .toList());
         }

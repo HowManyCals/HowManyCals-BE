@@ -53,6 +53,15 @@ public class MealRecommendationItem {
     @Column(name = "calories_snapshot", nullable = false)
     private Integer caloriesSnapshot;
 
+    @Column(name = "carbohydrate_snapshot")
+    private Double carbohydrateSnapshot;
+
+    @Column(name = "protein_snapshot")
+    private Double proteinSnapshot;
+
+    @Column(name = "fat_snapshot")
+    private Double fatSnapshot;
+
     void assignRecommendation(DailyMealRecommendation recommendation) {
         this.recommendation = recommendation;
     }

@@ -58,5 +58,14 @@ public class DailyMealRecommendationResponseDto {
 
         @JsonProperty("calories")
         private Integer calories;
+
+        @JsonProperty("carbohydrate")
+        private Double carbohydrate;
+
+        @JsonProperty("protein")
+        private Double protein;
+
+        @JsonProperty("fat")
+        private Double fat;
     }
 }
